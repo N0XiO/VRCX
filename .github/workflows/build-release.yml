@@ -1,0 +1,208 @@
+name: Build and Publish Release
+
+on:
+    workflow_call:
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+concurrency:
+    group: build-release
+    cancel-in-progress: false
+
+jobs:
+    set_version:
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.version.outputs.version }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: master
+            - id: version
+              run: |
+                  VERSION=$(date -u +%Y.%m.%d)
+                  echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+                  echo "Release version: $VERSION"
+
+    build_node:
+        runs-on: ubuntu-latest
+        needs: [set_version]
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: master
+            - name: Set version file
+              run: echo "${{ needs.set_version.outputs.version }}" > Version
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '24'
+            - name: Get npm cache directory
+              id: npm-cache-dir
+              run: echo "dir=$(npm config get cache)" >> "$GITHUB_OUTPUT"
+            - uses: actions/cache@v4
+              with:
+                  path: ${{ steps.npm-cache-dir.outputs.dir }}
+                  key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-node-
+            - name: Install dependencies
+              run: npm ci
+            - name: Build frontend
+              run: npm run prod
+            - name: Upload Cef-html artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: Cef-html
+                  path: build/html
+
+    build_dotnet_cef:
+        runs-on: windows-latest
+        defaults:
+            run:
+                shell: bash
+        needs: [set_version, build_node]
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: master
+            - name: Set version file and NSIS version define
+              run: |
+                  echo "${{ needs.set_version.outputs.version }}" > Version
+                  echo "!define PRODUCT_VERSION_FROM_FILE \"${{ needs.set_version.outputs.version }}.0\"" > Installer/version_define.nsh
+            - name: Setup .NET 10
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: '10.0.x'
+            - uses: actions/cache@v4
+              with:
+                  path: ~/.nuget/packages
+                  key: ${{ runner.os }}-nuget-${{ hashFiles('**/Dotnet/VRCX-Cef.csproj') }}
+                  restore-keys: |
+                      ${{ runner.os }}-nuget-
+            - name: Build CEF .NET application
+              run: dotnet build Dotnet/VRCX-Cef.csproj -p:Configuration=Release -p:WarningLevel=0 -p:Platform=x64 -p:PlatformTarget=x64 -p:RestorePackagesConfig=true -t:"Restore;Clean;Build" -m -a x64 --self-contained
+            - name: Download Cef-html artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: Cef-html
+                  path: build/Cef/html
+            - name: Install NSIS
+              run: choco install nsis -y
+            - name: Create NSIS installer
+              uses: joncloud/makensis-action@v4
+              with:
+                  script-file: Installer/installer.nsi
+                  additional-plugin-paths: Installer/Plugins
+            - name: Rename setup executable
+              run: |
+                  VERSION="${{ needs.set_version.outputs.version }}"
+                  FILE_NAME="VRCX_${VERSION}_Setup.exe"
+                  echo "Setup filename: ${FILE_NAME}"
+                  mv Installer/VRCX_Setup.exe "${FILE_NAME}"
+            - name: Upload Cef release artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: Cef-Release
+                  path: build/Cef
+            - name: Upload setup artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: Cef-Setup
+                  path: VRCX_${{ needs.set_version.outputs.version }}_Setup.exe
+
+    publish_release:
+        runs-on: ubuntu-latest
+        needs: [set_version, build_dotnet_cef]
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: master
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Configure git identity
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Download Cef release artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: Cef-Release
+                  path: release-staging/Cef
+
+            - name: Download Cef-html artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: Cef-html
+                  path: release-staging/Cef/html
+
+            - name: Download setup artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: Cef-Setup
+                  path: release-staging
+
+            - name: Create ZIP archive
+              run: |
+                  VERSION="${{ needs.set_version.outputs.version }}"
+                  ZIP_NAME="VRCX_${VERSION}.zip"
+                  cd release-staging/Cef
+                  7z a -tzip "../../${ZIP_NAME}" * -mx=7 '-xr0!*.log' '-xr0!*.pdb'
+                  echo "Zip: ${ZIP_NAME}"
+
+            - name: Compute SHA256 checksums
+              run: |
+                  VERSION="${{ needs.set_version.outputs.version }}"
+                  sha256sum \
+                    "VRCX_${VERSION}.zip" \
+                    "release-staging/VRCX_${VERSION}_Setup.exe" \
+                    > SHA256SUMS.txt
+                  cat SHA256SUMS.txt
+
+            - name: Bump version file if changed
+              run: |
+                  VERSION="${{ needs.set_version.outputs.version }}"
+                  CURRENT=$(cat Version | tr -d '[:space:]')
+                  if [ "$VERSION" != "$CURRENT" ]; then
+                    echo "$VERSION" > Version
+                    git add Version
+                    git commit -m "chore: bump version to $VERSION"
+                    git push origin master
+                  else
+                    echo "Version file already at $VERSION"
+                  fi
+
+            - name: Publish GitHub release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION="${{ needs.set_version.outputs.version }}"
+                  TAG="v${VERSION}"
+                  SETUP_FILE="release-staging/VRCX_${VERSION}_Setup.exe"
+                  ZIP_FILE="VRCX_${VERSION}.zip"
+
+                  # Generate release notes from last upstream commit subject
+                  NOTES=$(git log --pretty=format:'%s' -1)
+
+                  # Check if the release tag already exists
+                  if gh release view "$TAG" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+                    echo "Release $TAG already exists — uploading/overwriting assets"
+                    gh release upload "$TAG" \
+                      "$ZIP_FILE" \
+                      "$SETUP_FILE" \
+                      SHA256SUMS.txt \
+                      --repo "${{ github.repository }}" \
+                      --clobber
+                  else
+                    gh release create "$TAG" \
+                      --repo "${{ github.repository }}" \
+                      --title "VRCX $VERSION" \
+                      --notes "$NOTES" \
+                      "$ZIP_FILE" \
+                      "$SETUP_FILE" \
+                      SHA256SUMS.txt
+                  fi

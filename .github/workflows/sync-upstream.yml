@@ -1,0 +1,129 @@
+name: Sync Upstream VRCX
+
+on:
+    schedule:
+        - cron: '0 10 * * *' # Daily at 10:00 UTC
+    workflow_dispatch:
+        inputs:
+            force:
+                description: 'Force re-apply patches even if no new upstream commits'
+                type: boolean
+                default: false
+            skip_build:
+                description: 'Sync only — do not trigger build/release'
+                type: boolean
+                default: false
+
+permissions:
+    contents: write
+
+concurrency:
+    group: sync-upstream
+    cancel-in-progress: true
+
+jobs:
+    sync:
+        runs-on: ubuntu-latest
+        outputs:
+            has_changes: ${{ steps.check.outputs.has_changes }}
+        steps:
+            - name: Checkout fork
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Configure git identity
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            - name: Add and fetch upstream remote
+              run: |
+                  git remote add upstream https://github.com/vrcx-team/VRCX.git 2>/dev/null || true
+                  git fetch upstream
+
+            - name: Check for new upstream commits
+              id: check
+              run: |
+                  NEW_COMMITS=$(git log --oneline HEAD..upstream/master 2>/dev/null)
+                  FORCE="${{ inputs.force }}"
+                  if [ -n "$NEW_COMMITS" ] || [ "$FORCE" = "true" ]; then
+                    echo "has_changes=true" >> "$GITHUB_OUTPUT"
+                    if [ -n "$NEW_COMMITS" ]; then
+                      echo "New upstream commits:"
+                      echo "$NEW_COMMITS"
+                    else
+                      echo "No new commits, but force=true — re-patching anyway"
+                    fi
+                  else
+                    echo "has_changes=false" >> "$GITHUB_OUTPUT"
+                    echo "Already up to date. Use workflow_dispatch with force=true to re-patch."
+                  fi
+
+            - name: Merge upstream/master
+              if: steps.check.outputs.has_changes == 'true'
+              run: |
+                  NEW_COMMITS=$(git log --oneline HEAD..upstream/master 2>/dev/null)
+                  if [ -n "$NEW_COMMITS" ]; then
+                    git merge upstream/master --no-edit
+                  fi
+
+            - name: Apply fork patches
+              if: steps.check.outputs.has_changes == 'true'
+              shell: pwsh
+              run: |
+                  # Patch A: isLocalUserVrcPlusSupporter always returns true
+                  $userJsPath = "src/stores/user.js"
+                  $content = Get-Content $userJsPath -Raw
+                  if ($content -match 'isLocalUserVrcPlusSupporter\s*=\s*computed\(\s*\(\)\s*=>\s*true\s*\)') {
+                      Write-Host "[SKIP] $userJsPath – patch already applied"
+                  } else {
+                      $content = $content -replace `
+                          'const isLocalUserVrcPlusSupporter\s*=\s*computed\([^)]*\)(?:\s*\))?;', `
+                          'const isLocalUserVrcPlusSupporter = computed(() => true);'
+                      Set-Content $userJsPath $content -NoNewline -Encoding UTF8
+                      Write-Host "[PATCH] $userJsPath – VRC+ gate removed"
+                  }
+
+                  # Patch B: redirect release-channel URLs to this fork
+                  $settingsPath = "src/shared/constants/settings.js"
+                  $content = Get-Content $settingsPath -Raw
+                  if ($content -match 'kikookraft/VRCX') {
+                      Write-Host "[SKIP] $settingsPath – patch already applied"
+                  } else {
+                      $content = $content -replace `
+                          "urlReleases:\s*'https://api0\.vrcx\.app/releases/stable'", `
+                          "urlReleases: 'https://api.github.com/repos/kikookraft/VRCX/releases'"
+                      $content = $content -replace `
+                          "urlLatest:\s*'https://api0\.vrcx\.app/releases/stable/latest'", `
+                          "urlLatest: 'https://api.github.com/repos/kikookraft/VRCX/releases/latest'"
+                      $content = $content -replace `
+                          "urlReleases:\s*'https://api0\.vrcx\.app/releases/nightly'", `
+                          "urlReleases: 'https://api.github.com/repos/kikookraft/VRCX/releases'"
+                      $content = $content -replace `
+                          "urlLatest:\s*'https://api0\.vrcx\.app/releases/nightly/latest'", `
+                          "urlLatest: 'https://api.github.com/repos/kikookraft/VRCX/releases/latest'"
+                      Set-Content $settingsPath $content -NoNewline -Encoding UTF8
+                      Write-Host "[PATCH] $settingsPath – release URLs redirected to fork"
+                  }
+
+            - name: Commit and push patches
+              if: steps.check.outputs.has_changes == 'true'
+              run: |
+                  git add src/stores/user.js src/shared/constants/settings.js
+                  UPSTREAM_VERSION=$(cat Version | tr -d '[:space:]')
+                  if ! git diff --cached --quiet; then
+                    git commit -m "chore: apply fork patches on top of upstream $UPSTREAM_VERSION"
+                  else
+                    echo "No patch diff to commit (already up to date)"
+                  fi
+                  git push origin master
+
+    build-release:
+        needs: sync
+        if: needs.sync.outputs.has_changes == 'true' && inputs.skip_build != 'true'
+        uses: ./.github/workflows/build-release.yml
+        secrets: inherit
+        permissions:
+            contents: write
