@@ -1,4 +1,4 @@
-const VRChatScreenshotResolutions = [
+﻿const VRChatScreenshotResolutions = [
     { name: '1280x720 (720p)', width: 1280, height: 720 },
     { name: '1920x1080 (1080p Default)', width: '', height: '' },
     { name: '2560x1440 (1440p)', width: 2560, height: 1440 },
