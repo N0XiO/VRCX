@@ -27,17 +27,20 @@ import {
 } from 'lucide-vue-next';
 import { storeToRefs } from 'pinia';
 
-import { checkCanInvite, formatDateFilter } from '../../shared/utils';
-import { i18n } from '../../plugin';
+import { formatDateFilter } from '../../shared/utils';
+import { checkCanInvite } from '../../shared/utils/invite';
+import { i18n } from '../../plugins';
 import {
     useGameStore,
-    useGroupStore,
+    useInstanceStore,
     useLocationStore,
     useUiStore,
     useUserStore,
-    useWorldStore,
     useNotificationStore
 } from '../../stores';
+import { showUserDialog } from '../../coordinators/userCoordinator';
+import { showWorldDialog } from '../../coordinators/worldCoordinator';
+import { showGroupDialog } from '../../coordinators/groupCoordinator';
 
 import Emoji from '../../components/Emoji.vue';
 
@@ -61,19 +64,24 @@ export const createColumns = ({
     deleteNotificationLog,
     deleteNotificationLogPrompt
 }) => {
-    const { showUserDialog, showSendBoopDialog } = useUserStore();
-    const { showWorldDialog } = useWorldStore();
-    const { showGroupDialog } = useGroupStore();
+    const { showSendBoopDialog } = useUserStore();
+
     const { shiftHeld } = storeToRefs(useUiStore());
     const { currentUser } = storeToRefs(useUserStore());
     const { lastLocation } = storeToRefs(useLocationStore());
     const { isGameRunning } = storeToRefs(useGameStore());
     const { isNotificationExpired } = useNotificationStore();
 
+    const { cachedInstances } = storeToRefs(useInstanceStore());
+
     const canInvite = () => {
         const location = lastLocation.value?.location;
         return (
-            Boolean(location) && isGameRunning.value && checkCanInvite(location)
+            Boolean(location) && isGameRunning.value && checkCanInvite(location, {
+                currentUserId: currentUser.value?.id,
+                lastLocationStr: lastLocation.value?.location,
+                cachedInstances: cachedInstances.value
+            })
         );
     };
 

@@ -7,24 +7,26 @@ import { useRouter } from 'vue-router';
 import { compareByName, localeIncludes } from '../shared/utils';
 import { instanceRequest, userRequest } from '../api';
 import { groupRequest } from '../api/';
-import removeConfusables, { removeWhitespace } from '../service/confusables';
+import removeConfusables, { removeWhitespace } from '../services/confusables';
 import { useAppearanceSettingsStore } from './settings/appearance';
-import { useAvatarStore } from './avatar';
 import { useFriendStore } from './friend';
-import { useGroupStore } from './group';
+import { showGroupDialog } from '../coordinators/groupCoordinator';
+import { showWorldDialog } from '../coordinators/worldCoordinator';
+import { showAvatarDialog } from '../coordinators/avatarCoordinator';
+import {
+    applyUser,
+    showUserDialog,
+    lookupUser
+} from '../coordinators/userCoordinator';
 import { useModalStore } from './modal';
 import { useUserStore } from './user';
-import { useWorldStore } from './world';
-import { watchState } from '../service/watchState';
+import { watchState } from '../services/watchState';
 
 export const useSearchStore = defineStore('Search', () => {
     const userStore = useUserStore();
     const router = useRouter();
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const friendStore = useFriendStore();
-    const worldStore = useWorldStore();
-    const avatarStore = useAvatarStore();
-    const groupStore = useGroupStore();
     const modalStore = useModalStore();
     const { t } = useI18n();
 
@@ -93,7 +95,7 @@ export const useSearchStore = defineStore('Search', () => {
                     console.error('getUsers gave us garbage', json);
                     continue;
                 }
-                userStore.applyUser(json);
+                applyUser(json);
             }
 
             const map = new Map();
@@ -210,10 +212,10 @@ export const useSearchStore = defineStore('Search', () => {
             } else {
                 router.push({ name: 'search' });
                 searchText.value = searchTerm;
-                userStore.lookupUser({ displayName: searchTerm });
+                lookupUser({ displayName: searchTerm });
             }
         } else {
-            userStore.showUserDialog(value);
+            showUserDialog(value);
         }
     }
 
@@ -273,15 +275,15 @@ export const useSearchStore = defineStore('Search', () => {
             const type = urlPathSplit[2];
             if (type === 'user') {
                 const userId = urlPathSplit[3];
-                userStore.showUserDialog(userId);
+                showUserDialog(userId);
                 return true;
             } else if (type === 'avatar') {
                 const avatarId = urlPathSplit[3];
-                avatarStore.showAvatarDialog(avatarId);
+                showAvatarDialog(avatarId);
                 return true;
             } else if (type === 'group') {
                 const groupId = urlPathSplit[3];
-                groupStore.showGroupDialog(groupId);
+                showGroupDialog(groupId);
                 return true;
             }
         } else if (input.startsWith('https://vrc.group/')) {
@@ -295,16 +297,16 @@ export const useSearchStore = defineStore('Search', () => {
             input.substring(0, 4) === 'usr_' ||
             /^[A-Za-z0-9]{10}$/g.test(input)
         ) {
-            userStore.showUserDialog(input);
+            showUserDialog(input);
             return true;
         } else if (
             input.substring(0, 5) === 'avtr_' ||
             input.substring(0, 2) === 'b_'
         ) {
-            avatarStore.showAvatarDialog(input);
+            showAvatarDialog(input);
             return true;
         } else if (input.substring(0, 4) === 'grp_') {
-            groupStore.showGroupDialog(input);
+            showGroupDialog(input);
             return true;
         }
         return false;
@@ -331,7 +333,7 @@ export const useSearchStore = defineStore('Search', () => {
             const urlPathSplit = urlPath.split('/');
             if (urlPathSplit.length >= 4 && urlPathSplit[2] === 'world') {
                 worldId = urlPathSplit[3];
-                worldStore.showWorldDialog(worldId);
+                showWorldDialog(worldId);
                 return true;
             } else if (urlPath.substring(5, 12) === '/launch') {
                 const urlParams = new URLSearchParams(url.search);
@@ -343,10 +345,10 @@ export const useSearchStore = defineStore('Search', () => {
                     if (shortName) {
                         return verifyShortName(location, shortName);
                     }
-                    worldStore.showWorldDialog(location);
+                    showWorldDialog(location);
                     return true;
                 } else if (worldId) {
-                    worldStore.showWorldDialog(worldId);
+                    showWorldDialog(worldId);
                     return true;
                 }
             }
@@ -360,7 +362,7 @@ export const useSearchStore = defineStore('Search', () => {
                 input = `https://vrchat.com/home/launch?worldId=${input}`;
                 return directAccessWorld(input);
             }
-            worldStore.showWorldDialog(input.trim());
+            showWorldDialog(input.trim());
             return true;
         }
         return false;
@@ -399,7 +401,7 @@ export const useSearchStore = defineStore('Search', () => {
         groupRequest.groupStrictsearch({ query: shortCode }).then((args) => {
             for (const group of args.json) {
                 if (`${group.shortCode}.${group.discriminator}` === shortCode) {
-                    groupStore.showGroupDialog(group.id);
+                    showGroupDialog(group.id);
                     break;
                 }
             }
@@ -414,11 +416,11 @@ export const useSearchStore = defineStore('Search', () => {
                 const newLocation = args.json.location;
                 const newShortName = args.json.shortName;
                 if (newShortName) {
-                    worldStore.showWorldDialog(newLocation, newShortName);
+                    showWorldDialog(newLocation, newShortName);
                 } else if (newLocation) {
-                    worldStore.showWorldDialog(newLocation);
+                    showWorldDialog(newLocation);
                 } else {
-                    worldStore.showWorldDialog(location);
+                    showWorldDialog(location);
                 }
                 return args;
             });

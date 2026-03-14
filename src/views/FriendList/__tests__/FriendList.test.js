@@ -40,9 +40,13 @@ mocks.pagination = mocks.makeRef({
 });
 mocks.sorting = mocks.makeRef([]);
 
-vi.mock('pinia', () => ({
-    storeToRefs: (store) => store
-}));
+vi.mock('pinia', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        storeToRefs: (store) => store
+    };
+});
 
 vi.mock('vue-i18n', () => ({
     useI18n: () => ({
@@ -66,9 +70,7 @@ vi.mock('../../../stores', () => ({
         friends: mocks.friends,
         allFavoriteFriendIds: mocks.allFavoriteFriendIds,
         getAllUserStats: mocks.getAllUserStats,
-        getAllUserMutualCount: mocks.getAllUserMutualCount,
-        confirmDeleteFriend: mocks.confirmDeleteFriend,
-        handleFriendDelete: mocks.handleFriendDelete
+        getAllUserMutualCount: mocks.getAllUserMutualCount
     }),
     useModalStore: () => ({
         confirm: (...args) => mocks.modalConfirm(...args),
@@ -78,9 +80,7 @@ vi.mock('../../../stores', () => ({
         stringComparer: mocks.stringComparer,
         friendsListSearch: mocks.friendsListSearch
     }),
-    useUserStore: () => ({
-        showUserDialog: (...args) => mocks.showUserDialog(...args)
-    }),
+    useUserStore: () => ({}),
     useAppearanceSettingsStore: () => ({
         tablePageSizes: [10, 25, 50],
         tablePageSize: 25,
@@ -91,7 +91,16 @@ vi.mock('../../../stores', () => ({
     })
 }));
 
-vi.mock('../../../plugin/router', () => ({
+vi.mock('../../../coordinators/userCoordinator', () => ({
+    showUserDialog: (...args) => mocks.showUserDialog(...args)
+}));
+
+vi.mock('../../../coordinators/friendRelationshipCoordinator', () => ({
+    confirmDeleteFriend: (...args) => mocks.confirmDeleteFriend(...args),
+    handleFriendDelete: (...args) => mocks.handleFriendDelete(...args)
+}));
+
+vi.mock('../../../plugins/router', () => ({
     router: {
         push: (...args) => mocks.routerPush(...args)
     }
@@ -106,7 +115,7 @@ vi.mock('../../../api', () => ({
     }
 }));
 
-vi.mock('../../../service/confusables', () => ({
+vi.mock('../../../services/confusables', () => ({
     default: (value) => value,
     removeWhitespace: (value) => String(value ?? '').replace(/\s+/g, '')
 }));

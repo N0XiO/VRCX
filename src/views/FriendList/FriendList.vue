@@ -144,10 +144,12 @@
     import { Toggle } from '../../components/ui/toggle';
     import { createColumns } from './columns.jsx';
     import { localeIncludes } from '../../shared/utils';
-    import removeConfusables, { removeWhitespace } from '../../service/confusables';
-    import { router } from '../../plugin/router';
+    import removeConfusables, { removeWhitespace } from '../../services/confusables';
+    import { router } from '../../plugins/router';
     import { useDataTableScrollHeight } from '../../composables/useDataTableScrollHeight';
     import { useVrcxVueTable } from '../../lib/table/useVrcxVueTable';
+    import { showUserDialog } from '../../coordinators/userCoordinator';
+    import { confirmDeleteFriend, handleFriendDelete } from '../../coordinators/friendRelationshipCoordinator';
 
     const { t } = useI18n();
 
@@ -155,10 +157,10 @@
 
     const { friends, allFavoriteFriendIds } = storeToRefs(useFriendStore());
     const modalStore = useModalStore();
-    const { getAllUserStats, getAllUserMutualCount, confirmDeleteFriend, handleFriendDelete } = useFriendStore();
+    const { getAllUserStats, getAllUserMutualCount } = useFriendStore();
     const appearanceSettingsStore = useAppearanceSettingsStore();
     const { randomUserColours } = storeToRefs(appearanceSettingsStore);
-    const { showUserDialog } = useUserStore();
+
     const { stringComparer, friendsListSearch } = storeToRefs(useSearchStore());
 
     const friendsListSearchFilters = ref([]);

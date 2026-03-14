@@ -91,6 +91,7 @@
         useNotificationStore,
         useUserStore
     } from '../../../stores';
+    import { showGroupDialog } from '../../../coordinators/groupCoordinator';
     import { copyToClipboard } from '../../../shared/utils';
     import { formatJsonVars } from '../../../shared/utils/base/ui';
     import { miscRequest } from '../../../api';
@@ -139,16 +140,17 @@
     const instanceStore = useInstanceStore();
 
     const { userDialog, languageDialog, currentUser, isLocalUserVrcPlusSupporter } = storeToRefs(useUserStore());
-    const { cachedUsers, showUserDialog, refreshUserDialogAvatars, showSendBoopDialog } = useUserStore();
+    const { cachedUsers, showSendBoopDialog } = useUserStore();
     const { showFavoriteDialog } = useFavoriteStore();
-    const { showAvatarDialog, showAvatarAuthorDialog } = useAvatarStore();
+    import { showAvatarDialog, showAvatarAuthorDialog } from '../../../coordinators/avatarCoordinator';
+    import { showUserDialog, refreshUserDialogAvatars } from '../../../coordinators/userCoordinator';
+    import { getFriendRequest, handleFriendDelete } from '../../../coordinators/friendRelationshipCoordinator';
 
-    const { showGroupDialog, showModerateGroupDialog } = useGroupStore();
+    const { showModerateGroupDialog } = useGroupStore();
     const { inviteGroupDialog } = storeToRefs(useGroupStore());
     const { lastLocation, lastLocationDestination } = storeToRefs(useLocationStore());
     const { refreshInviteMessageTableData } = useInviteStore();
     const { friendLogTable } = storeToRefs(useFriendStore());
-    const { getFriendRequest, handleFriendDelete } = useFriendStore();
     const { clearInviteImageUpload, showGalleryPage } = useGalleryStore();
 
     const { applyPlayerModeration, handlePlayerModerationDelete } = useModerationStore();

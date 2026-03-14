@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
         gameLogDisabled: { value: false }
     },
     userStore: {
-        showUserDialog: vi.fn(),
         showSendBoopDialog: vi.fn(),
         currentUser: {
             value: {
@@ -56,6 +55,9 @@ const mocks = vi.hoisted(() => ({
     gameStore: {
         isGameRunning: { value: true }
     },
+    instanceStore: {
+        cachedInstances: new Map()
+    },
     configRepository: {
         getBool: vi.fn(),
         setBool: vi.fn()
@@ -78,9 +80,13 @@ const mocks = vi.hoisted(() => ({
     }
 }));
 
-vi.mock('pinia', () => ({
-    storeToRefs: (store) => store
-}));
+vi.mock('pinia', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        storeToRefs: (store) => store
+    };
+});
 
 vi.mock('@tanstack/vue-virtual', () => ({
     useVirtualizer: (optionsRef) => ({
@@ -108,7 +114,12 @@ vi.mock('../../../../stores', () => ({
     useGameStore: () => mocks.gameStore,
     useLaunchStore: () => mocks.launchStore,
     useLocationStore: () => mocks.locationStore,
+    useInstanceStore: () => mocks.instanceStore,
     useUserStore: () => mocks.userStore
+}));
+
+vi.mock('../../../../coordinators/userCoordinator', () => ({
+    showUserDialog: vi.fn()
 }));
 
 vi.mock('../../../../shared/utils', () => ({
@@ -133,7 +144,7 @@ vi.mock('../../../../shared/utils/location.js', () => ({
     getFriendsLocations: vi.fn(() => 'wrld_same:1')
 }));
 
-vi.mock('../../../../service/config', () => ({
+vi.mock('../../../../services/config', () => ({
     default: mocks.configRepository
 }));
 
@@ -226,6 +237,7 @@ describe('FriendsSidebar.vue', () => {
         mocks.friendStore.activeFriends.value = [];
         mocks.friendStore.offlineFriends.value = [];
         mocks.friendStore.friendsInSameInstance.value = [];
+        mocks.instanceStore.cachedInstances = new Map();
 
         mocks.appearanceStore.isSidebarGroupByInstance.value = false;
         mocks.appearanceStore.isHideFriendsInSameInstance.value = false;

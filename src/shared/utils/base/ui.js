@@ -1,5 +1,4 @@
 import { ref } from 'vue';
-import { storeToRefs } from 'pinia';
 import { toast } from 'vue-sonner';
 
 import {
@@ -8,12 +7,11 @@ import {
     THEME_COLORS,
     THEME_CONFIG
 } from '../../constants';
-import { i18n } from '../../../plugin/i18n';
-import { router } from '../../../plugin/router';
+import { i18n } from '../../../plugins/i18n';
+import { router } from '../../../plugins/router';
 import { textToHex } from './string';
-import { useAppearanceSettingsStore } from '../../../stores';
 
-import configRepository from '../../../service/config.js';
+import configRepository from '../../../services/config.js';
 
 const THEME_COLOR_STORAGE_KEY = 'VRCX_themeColor';
 const THEME_COLOR_STYLE_ID = 'app-theme-color-style';
@@ -318,13 +316,12 @@ async function refreshCustomScript() {
 /**
  *
  * @param {number} hue
+ * @param isDarkMode
  * @returns {string}
  */
-function HueToHex(hue) {
-    const appSettingsStore = useAppearanceSettingsStore();
-    const { isDarkMode } = storeToRefs(appSettingsStore);
+function HueToHex(hue, isDarkMode) {
     // this.HSVtoRGB(hue / 65535, .8, .8);
-    if (isDarkMode.value) {
+    if (isDarkMode) {
         return HSVtoRGB(hue / 65535, 0.6, 1);
     }
     return HSVtoRGB(hue / 65535, 1, 0.7);

@@ -204,18 +204,20 @@
         useUserStore
     } from '../../../stores';
     import { buildFriendRow, buildInstanceHeaderRow, buildToggleRow, estimateRowSize } from '../friendsSidebarUtils';
-    import { getFriendsSortFunction, isRealInstance, userImage, userStatusClass } from '../../../shared/utils';
+    import { getFriendsSortFunction, isRealInstance } from '../../../shared/utils';
     import { instanceRequest, notificationRequest, queryRequest, userRequest } from '../../../api';
-    import { checkCanInvite, checkCanInviteSelf } from '../../../shared/utils/invite.js';
+    import { useInviteChecks } from '../../../composables/useInviteChecks';
+    import { useUserDisplay } from '../../../composables/useUserDisplay';
     import { getFriendsLocations } from '../../../shared/utils/location.js';
     import { parseLocation } from '../../../shared/utils';
 
     import BackToTop from '../../../components/BackToTop.vue';
     import FriendItem from './FriendItem.vue';
     import Location from '../../../components/Location.vue';
-    import configRepository from '../../../service/config';
+    import configRepository from '../../../services/config';
 
     import '@/styles/status-icon.css';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
 
     const { t } = useI18n();
 
@@ -238,13 +240,15 @@
         sidebarSortMethods
     } = storeToRefs(appearanceSettingsStore);
     const { gameLogDisabled } = storeToRefs(useAdvancedSettingsStore());
-    const { showUserDialog, showSendBoopDialog } = useUserStore();
+    const { showSendBoopDialog } = useUserStore();
     const launchStore = useLaunchStore();
     const { favoriteFriendGroups, groupedByGroupKeyFavoriteFriends, localFriendFavorites } =
         storeToRefs(useFavoriteStore());
     const { lastLocation, lastLocationDestination } = storeToRefs(useLocationStore());
     const { isGameRunning } = storeToRefs(useGameStore());
     const { currentUser } = storeToRefs(useUserStore());
+    const { checkCanInvite, checkCanInviteSelf } = useInviteChecks();
+    const { userImage, userStatusClass } = useUserDisplay();
 
     const isFriendsGroupMe = ref(true);
     const isVIPFriends = ref(true);
@@ -475,7 +479,11 @@
                     if (!friendArr || !friendArr.length) return;
                     const groupKey = friendArr?.[0]?.ref?.$location?.tag ?? `group-${groupIndex}`;
                     rows.push(
-                        buildInstanceHeaderRow(getFriendsLocations(friendArr), friendArr.length, `instance:${groupKey}`)
+                        buildInstanceHeaderRow(
+                            getFriendsLocations(friendArr, lastLocation.value),
+                            friendArr.length,
+                            `instance:${groupKey}`
+                        )
                     );
                     friendArr.forEach((friend, idx) => {
                         rows.push(
@@ -753,7 +761,7 @@
             currentLocation = lastLocationDestination.value;
         }
         const L = parseLocation(currentLocation);
-        queryRequest.fetch('world', { worldId: L.worldId }).then((args) => {
+        queryRequest.fetch('world.location', { worldId: L.worldId }).then((args) => {
             notificationRequest
                 .sendInvite(
                     {

@@ -305,8 +305,7 @@
                                                 :favorite="favorite"
                                                 :edit-mode="worldEditMode"
                                                 :selected="selectedFavoriteWorlds.includes(favorite.id)"
-                                                @toggle-select="toggleWorldSelection(favorite.id, $event)"
-                                                @click="showWorldDialog(favorite.id)" />
+                                                @toggle-select="toggleWorldSelection(favorite.id, $event)" />
                                         </div>
                                     </template>
                                     <div v-else class="flex items-center justify-center text-[13px] h-full">
@@ -339,9 +338,7 @@
                                                             :group="activeLocalGroupName"
                                                             :favorite="favorite.favorite"
                                                             :edit-mode="worldEditMode"
-                                                            is-local-favorite
-                                                            @remove-local-world-favorite="removeLocalWorldFavorite"
-                                                            @click="showWorldDialog(favorite.favorite.id)" />
+                                                            is-local-favorite />
                                                     </div>
                                                 </div>
                                             </template>
@@ -388,6 +385,7 @@
         DropdownMenuTrigger
     } from '../../components/ui/dropdown-menu';
     import { useAppearanceSettingsStore, useFavoriteStore, useModalStore, useWorldStore } from '../../stores';
+    import { showWorldDialog } from '../../coordinators/worldCoordinator';
     import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../../components/ui/resizable';
     import { favoriteRequest, worldRequest } from '../../api';
     import { debounce } from '../../shared/utils';
@@ -395,6 +393,13 @@
     import { useFavoritesGroupPanel } from './composables/useFavoritesGroupPanel.js';
     import { useFavoritesLocalGroups } from './composables/useFavoritesLocalGroups.js';
     import { useFavoritesSplitter } from './composables/useFavoritesSplitter.js';
+    import {
+        renameLocalWorldFavoriteGroup,
+        removeLocalWorldFavorite,
+        newLocalWorldFavoriteGroup,
+        refreshFavorites,
+        getLocalWorldFavorites
+    } from '../../coordinators/favoriteCoordinator';
 
     import FavoritesContentHeader from './components/FavoritesContentHeader.vue';
     import FavoritesToolbar from './components/FavoritesToolbar.vue';
@@ -426,15 +431,9 @@
         showWorldImportDialog,
         localWorldFavGroupLength,
         deleteLocalWorldFavoriteGroup,
-        renameLocalWorldFavoriteGroup,
-        removeLocalWorldFavorite,
-        newLocalWorldFavoriteGroup,
         handleFavoriteGroup,
-        localWorldFavoritesList,
-        refreshFavorites,
-        getLocalWorldFavorites
+        localWorldFavoritesList
     } = favoriteStore;
-    const { showWorldDialog } = useWorldStore();
 
     const {
         cardScale: worldCardScale,

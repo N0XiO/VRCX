@@ -125,21 +125,24 @@
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
-    import { removeFromArray, userImage, userImageFull } from '../../../shared/utils';
+    import { removeFromArray } from '../../../shared/utils';
+    import { useUserDisplay } from '../../../composables/useUserDisplay';
     import { useFavoriteStore, useGalleryStore, useUserStore } from '../../../stores';
+    import { addLocalFriendFavorite } from '../../../coordinators/favoriteCoordinator';
     import { favoriteRequest, userRequest } from '../../../api';
     import { createColumns } from './friendImportColumns.jsx';
     import { useVrcxVueTable } from '../../../lib/table/useVrcxVueTable';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
 
+    const { userImage, userImageFull } = useUserDisplay();
     const { t } = useI18n();
 
     const emit = defineEmits(['update:friendImportDialogInput']);
 
-    const { showUserDialog } = useUserStore();
     const { favoriteFriendGroups, friendImportDialogInput, friendImportDialogVisible, localFriendFavoriteGroups } =
         storeToRefs(useFavoriteStore());
     const { showFullscreenImageDialog } = useGalleryStore();
-    const { getCachedFavoritesByObjectId, localFriendFavGroupLength, addLocalFriendFavorite } = useFavoriteStore();
+    const { getCachedFavoritesByObjectId, localFriendFavGroupLength } = useFavoriteStore();
 
     const friendImportDialog = ref({
         loading: false,

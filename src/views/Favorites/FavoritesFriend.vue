@@ -246,8 +246,7 @@
                                                 :group="activeRemoteGroup"
                                                 :selected="selectedFavoriteFriends.includes(favorite.id)"
                                                 :edit-mode="friendEditMode"
-                                                @toggle-select="toggleFriendSelection(favorite.id, $event)"
-                                                @click="showUserDialog(favorite.id)" />
+                                                @toggle-select="toggleFriendSelection(favorite.id, $event)" />
                                         </div>
                                     </template>
                                     <div v-else class="flex items-center justify-center text-[13px] h-full">
@@ -268,8 +267,7 @@
                                                 :group="{ key: activeLocalGroupName, type: 'local' }"
                                                 :selected="selectedFavoriteFriends.includes(favorite.id)"
                                                 :edit-mode="friendEditMode"
-                                                @toggle-select="toggleFriendSelection(favorite.id, $event)"
-                                                @click="showUserDialog(favorite.id)" />
+                                                @toggle-select="toggleFriendSelection(favorite.id, $event)" />
                                         </div>
                                     </template>
                                     <div v-else class="flex items-center justify-center text-[13px] h-full">
@@ -350,18 +348,28 @@
     } from '../../components/ui/dropdown-menu';
     import { useAppearanceSettingsStore, useFavoriteStore, useModalStore, useUserStore } from '../../stores';
     import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../../components/ui/resizable';
-    import { debounce, userImage } from '../../shared/utils';
+    import { debounce } from '../../shared/utils';
+    import { useUserDisplay } from '../../composables/useUserDisplay';
     import { favoriteRequest } from '../../api';
     import { useFavoritesCardScaling } from './composables/useFavoritesCardScaling.js';
     import { useFavoritesGroupPanel } from './composables/useFavoritesGroupPanel.js';
     import { useFavoritesLocalGroups } from './composables/useFavoritesLocalGroups.js';
     import { useFavoritesSplitter } from './composables/useFavoritesSplitter.js';
+    import {
+        refreshFavorites,
+        getLocalWorldFavorites,
+        getLocalFriendFavorites,
+        deleteLocalFriendFavoriteGroup,
+        renameLocalFriendFavoriteGroup,
+        removeLocalFriendFavorite
+    } from '../../coordinators/favoriteCoordinator';
 
     import FavoritesContentHeader from './components/FavoritesContentHeader.vue';
     import FavoritesFriendItem from './components/FavoritesFriendItem.vue';
     import FavoritesToolbar from './components/FavoritesToolbar.vue';
     import FriendExportDialog from './dialogs/FriendExportDialog.vue';
 
+    const { userImage } = useUserDisplay();
     const friendGroupVisibilityOptions = ref(['public', 'friends', 'private']);
 
     const {
@@ -388,18 +396,8 @@
         localFriendFavorites,
         localFriendFavoriteGroups
     } = storeToRefs(favoriteStore);
-    const {
-        showFriendImportDialog,
-        refreshFavorites,
-        getLocalWorldFavorites,
-        getLocalFriendFavorites,
-        handleFavoriteGroup,
-        localFriendFavGroupLength,
-        deleteLocalFriendFavoriteGroup,
-        renameLocalFriendFavoriteGroup,
-        newLocalFriendFavoriteGroup,
-        removeLocalFriendFavorite
-    } = favoriteStore;
+    const { showFriendImportDialog, handleFavoriteGroup, localFriendFavGroupLength, newLocalFriendFavoriteGroup } =
+        favoriteStore;
     const userStore = useUserStore();
     const { showUserDialog } = userStore;
     const { cachedUsers } = storeToRefs(userStore);

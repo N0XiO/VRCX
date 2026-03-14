@@ -7,7 +7,7 @@ const mockApplyCurrentUser = vi.fn((json) => ({ id: json.id || 'usr_me', ...json
 const mockApplyUser = vi.fn((json) => ({ ...json }));
 const mockApplyWorld = vi.fn((json) => ({ ...json }));
 
-vi.mock('../../service/request', () => ({
+vi.mock('../../services/request', () => ({
     request: (...args) => mockRequest(...args)
 }));
 
@@ -22,6 +22,15 @@ vi.mock('../../stores', () => ({
     })
 }));
 
+vi.mock('../../coordinators/userCoordinator', () => ({
+    applyCurrentUser: (...args) => mockApplyCurrentUser(...args),
+    applyUser: (...args) => mockApplyUser(...args)
+}));
+
+vi.mock('../../coordinators/worldCoordinator', () => ({
+    applyWorld: (...args) => mockApplyWorld(...args)
+}));
+
 vi.mock('../../queries', () => ({
     patchAndRefetchActiveQuery: (...args) =>
         mockPatchAndRefetchActiveQuery(...args),
@@ -29,6 +38,12 @@ vi.mock('../../queries', () => ({
         user: (userId) => ['user', userId],
         avatar: (avatarId) => ['avatar', avatarId],
         world: (worldId) => ['world', worldId]
+    },
+    entityQueryPolicies: {
+        user: {},
+        avatar: {},
+        world: {},
+        worldCollection: {}
     }
 }));
 

@@ -395,6 +395,7 @@
         useUserStore,
         useWorldStore
     } from '../../../stores';
+    import { showWorldDialog } from '../../../coordinators/worldCoordinator';
     import {
         DropdownMenu,
         DropdownMenuContent,
@@ -405,23 +406,24 @@
     import { deleteVRChatCache, openFolderGeneric } from '../../../shared/utils';
     import { Badge } from '../../ui/badge';
     import { formatJsonVars } from '../../../shared/utils/base/ui';
+    import { runNewInstanceSelfInviteFlow as newInstanceSelfInvite } from '../../../coordinators/inviteCoordinator';
     import { useWorldDialogCommands } from './useWorldDialogCommands';
 
     import DialogJsonTab from '../DialogJsonTab.vue';
     import ImageCropDialog from '../ImageCropDialog.vue';
     import WorldDialogInfoTab from './WorldDialogInfoTab.vue';
     import WorldDialogInstancesTab from './WorldDialogInstancesTab.vue';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
 
     const SetWorldTagsDialog = defineAsyncComponent(() => import('./SetWorldTagsDialog.vue'));
     const WorldAllowedDomainsDialog = defineAsyncComponent(() => import('./WorldAllowedDomainsDialog.vue'));
-    const NewInstanceDialog = defineAsyncComponent(() => import('../NewInstanceDialog.vue'));
+    const NewInstanceDialog = defineAsyncComponent(() => import('../NewInstanceDialog/NewInstanceDialog.vue'));
 
-    const { showUserDialog } = useUserStore();
     const { currentUser, userDialog } = storeToRefs(useUserStore());
     const { worldDialog } = storeToRefs(useWorldStore());
-    const { cachedWorlds, showWorldDialog } = useWorldStore();
+    const { cachedWorlds } = useWorldStore();
     const { lastLocation } = storeToRefs(useLocationStore());
-    const { newInstanceSelfInvite, canOpenInstanceInGame } = useInviteStore();
+    const { canOpenInstanceInGame } = useInviteStore();
     const { showFavoriteDialog } = useFavoriteStore();
     const { showPreviousInstancesListDialog: openPreviousInstancesListDialog } = useInstanceStore();
     const { isGameRunning } = storeToRefs(useGameStore());

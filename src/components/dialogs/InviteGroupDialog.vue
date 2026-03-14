@@ -96,13 +96,15 @@
     import { toast } from 'vue-sonner';
     import { useI18n } from 'vue-i18n';
 
-    import { hasGroupPermission, userImage, userStatusClass } from '../../shared/utils';
+    import { hasGroupPermission } from '../../shared/utils';
+    import { useUserDisplay } from '../../composables/useUserDisplay';
     import { useFriendStore, useGroupStore, useModalStore } from '../../stores';
     import { groupRequest, queryRequest } from '../../api';
     import { VirtualCombobox } from '../ui/virtual-combobox';
 
-    import configRepository from '../../service/config';
+    import configRepository from '../../services/config';
 
+    const { userImage, userStatusClass } = useUserDisplay();
     const { vipFriends, onlineFriends, activeFriends, offlineFriends } = storeToRefs(useFriendStore());
     const { currentUserGroups, inviteGroupDialog } = storeToRefs(useGroupStore());
     const { applyGroup } = useGroupStore();
@@ -256,7 +258,7 @@
         }
 
         if (D.userId) {
-            queryRequest.fetch('user', { userId: D.userId }).then((args) => {
+            queryRequest.fetch('user.dialog', { userId: D.userId }).then((args) => {
                 D.userObject = args.ref;
                 D.userIds = [D.userId];
             });

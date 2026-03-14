@@ -1,13 +1,14 @@
 import { createPinia } from 'pinia';
 
-import { getSentry, isSentryOptedIn } from '../plugin';
-import { createPiniaActionTrailPlugin } from '../plugin/piniaActionTrail';
+import { getSentry, isSentryOptedIn } from '../plugins';
+import { createPiniaActionTrailPlugin } from '../plugins/piniaActionTrail';
 import { useAdvancedSettingsStore } from './settings/advanced';
 import { useAppearanceSettingsStore } from './settings/appearance';
 import { useAuthStore } from './auth';
 import { useAvatarProviderStore } from './avatarProvider';
 import { useAvatarStore } from './avatar';
 import { useChartsStore } from './charts';
+import { useDashboardStore } from './dashboard';
 import { useDiscordPresenceSettingsStore } from './settings/discordPresence';
 import { useFavoriteStore } from './favorite';
 import { useFeedStore } from './feed';
@@ -164,6 +165,7 @@ export function createGlobalStores() {
         auth: useAuthStore(),
         vrcStatus: useVrcStatusStore(),
         charts: useChartsStore(),
+        dashboard: useDashboardStore(),
         modal: useModalStore(),
         globalSearch: useGlobalSearchStore()
     };
@@ -189,6 +191,7 @@ export {
     usePhotonStore,
     useSearchStore,
     useChartsStore,
+    useDashboardStore,
     useAdvancedSettingsStore,
     useAppearanceSettingsStore,
     useDiscordPresenceSettingsStore,

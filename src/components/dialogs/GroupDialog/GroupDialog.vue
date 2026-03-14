@@ -407,6 +407,13 @@
         removeFromArray
     } from '../../../shared/utils';
     import { useGalleryStore, useGroupStore, useModalStore, useUserStore } from '../../../stores';
+    import {
+        getGroupDialogGroup,
+        showGroupDialog,
+        leaveGroupPrompt,
+        setGroupVisibility,
+        setGroupSubscription
+    } from '../../../coordinators/groupCoordinator';
     import { groupRequest, queryRequest } from '../../../api';
     import { queryKeys, refetchActiveEntityQuery } from '../../../queries';
     import { Badge } from '../../ui/badge';
@@ -419,6 +426,7 @@
     import GroupDialogPhotosTab from './GroupDialogPhotosTab.vue';
     import GroupDialogPostsTab from './GroupDialogPostsTab.vue';
     import GroupPostEditDialog from './GroupPostEditDialog.vue';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
 
     const { t } = useI18n();
     const groupDialogTabs = computed(() => [
@@ -431,18 +439,9 @@
 
     const modalStore = useModalStore();
 
-    const { showUserDialog } = useUserStore();
     const { currentUser } = storeToRefs(useUserStore());
     const { groupDialog, inviteGroupDialog } = storeToRefs(useGroupStore());
-    const {
-        getGroupDialogGroup,
-        updateGroupPostSearch,
-        showGroupDialog,
-        leaveGroupPrompt,
-        setGroupVisibility,
-        setGroupSubscription,
-        showGroupMemberModerationDialog
-    } = useGroupStore();
+    const { updateGroupPostSearch, showGroupMemberModerationDialog } = useGroupStore();
 
     const { showFullscreenImageDialog } = useGalleryStore();
 
@@ -702,7 +701,7 @@
                 selectedImageUrl: post.imageUrl
             };
         }
-        queryRequest.fetch('group', { groupId }).then((args) => {
+        queryRequest.fetch('group.dialog', { groupId }).then((args) => {
             D.groupRef = args.ref;
         });
         D.visible = true;

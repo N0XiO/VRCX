@@ -83,10 +83,6 @@
                 :value="showInstanceIdInLocation"
                 @change="setShowInstanceIdInLocation" />
             <simple-switch
-                :label="t('view.settings.appearance.appearance.show_status_bar')"
-                :value="showStatusBar"
-                @change="setShowStatusBar" />
-            <simple-switch
                 :label="t('view.settings.appearance.appearance.nicknames')"
                 :value="!hideNicknames"
                 @change="
@@ -365,6 +361,7 @@
 
     import PresetColorPicker from '@/components/PresetColorPicker.vue';
     import TableLimitsDialog from '@/components/dialogs/TableLimitsDialog.vue';
+    import { saveSortFavoritesOption } from '@/coordinators/favoriteCoordinator';
 
     import SimpleSwitch from '../SimpleSwitch.vue';
 
@@ -392,19 +389,15 @@
         notificationIconDot,
         tablePageSizes,
         isDataTableStriped,
-        showPointerOnHover,
-        showStatusBar
+        showPointerOnHover
     } = storeToRefs(appearanceSettingsStore);
 
     const appLanguageDisplayName = computed(() => getLanguageName(String(appLanguage.value)));
-
-    const { saveSortFavoritesOption } = useFavoriteStore();
 
     const {
         setDisplayVRCPlusIconsAsAvatar,
         setHideNicknames,
         setShowInstanceIdInLocation,
-        setShowStatusBar,
         setIsAgeGatedInstancesVisible,
         setInstanceUsersSortAlphabetical,
         setDtHour12,

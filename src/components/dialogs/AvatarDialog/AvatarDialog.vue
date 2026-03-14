@@ -571,6 +571,7 @@
 
     import {
         useAppearanceSettingsStore,
+        useAuthStore,
         useAvatarStore,
         useFavoriteStore,
         useGalleryStore,
@@ -597,29 +598,35 @@
     } from '../../ui/dropdown-menu';
     import { Badge } from '../../ui/badge';
     import { avatarRequest } from '../../../api';
-    import { database } from '../../../service/database';
+    import { database } from '../../../services/database';
     import { formatJsonVars } from '../../../shared/utils/base/ui';
-    import { handleImageUploadInput } from '../../../shared/utils/imageUpload';
+    import { handleImageUploadInput } from '../../../coordinators/imageUploadCoordinator';
+    import { runDeleteVRChatCacheFlow as deleteVRChatCache } from '../../../coordinators/gameCoordinator';
+    import {
+        showAvatarDialog,
+        applyAvatar,
+        selectAvatarWithoutConfirmation
+    } from '../../../coordinators/avatarCoordinator';
     import { useAvatarDialogCommands } from './useAvatarDialogCommands';
 
     import DialogJsonTab from '../DialogJsonTab.vue';
     import ImageCropDialog from '../ImageCropDialog.vue';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
 
     const SetAvatarStylesDialog = defineAsyncComponent(() => import('./SetAvatarStylesDialog.vue'));
     const SetAvatarTagsDialog = defineAsyncComponent(() => import('./SetAvatarTagsDialog.vue'));
 
-    const { showUserDialog, sortUserDialogAvatars } = useUserStore();
+    const { sortUserDialogAvatars } = useUserStore();
     const { userDialog, currentUser } = storeToRefs(useUserStore());
     const avatarStore = useAvatarStore();
     const { cachedAvatarModerations, cachedAvatars } = avatarStore;
     const { avatarDialog } = storeToRefs(avatarStore);
-    const { showAvatarDialog, getAvatarGallery, applyAvatarModeration, applyAvatar, selectAvatarWithoutConfirmation } =
-        avatarStore;
+    const { getAvatarGallery, applyAvatarModeration } = avatarStore;
     const { showFavoriteDialog } = useFavoriteStore();
     const { isGameRunning } = storeToRefs(useGameStore());
-    const { deleteVRChatCache } = useGameStore();
     const { showFullscreenImageDialog } = useGalleryStore();
     const { isDarkMode } = storeToRefs(useAppearanceSettingsStore());
+    const authStore = useAuthStore();
     const modalStore = useModalStore();
     const uiStore = useUiStore();
 
@@ -696,7 +703,7 @@
                     // skip imposters
                     continue;
                 }
-                if (!compareUnityVersion(unityPackage.unitySortNumber)) {
+                if (!compareUnityVersion(unityPackage.unitySortNumber, authStore.cachedConfig.sdkUnityVersion)) {
                     continue;
                 }
                 let platform = 'PC';

@@ -21,18 +21,18 @@ import {
     updateTrustColorClasses
 } from '../../shared/utils/base/ui';
 import { computeTrustLevel, getNameColour } from '../../shared/utils';
-import { database } from '../../service/database';
+import { database } from '../../services/database';
 import { languageCodes } from '../../localization';
-import { loadLocalizedStrings } from '../../plugin';
+import { loadLocalizedStrings } from '../../plugins';
 import { useFeedStore } from '../feed';
 import { useGameLogStore } from '../gameLog';
 import { useUiStore } from '../ui';
 import { useUserStore } from '../user';
 import { useVrStore } from '../vr';
 import { useVrcxStore } from '../vrcx';
-import { watchState } from '../../service/watchState';
+import { watchState } from '../../services/watchState';
 
-import configRepository from '../../service/config';
+import configRepository from '../../services/config';
 
 export const useAppearanceSettingsStore = defineStore(
     'AppearanceSettings',
@@ -109,7 +109,6 @@ export const useAppearanceSettingsStore = defineStore(
 
         const isDataTableStriped = ref(false);
         const showPointerOnHover = ref(false);
-        const showStatusBar = ref(true);
         const tableLimitsDialog = ref({
             visible: false,
             maxTableSize: 500,
@@ -168,7 +167,6 @@ export const useAppearanceSettingsStore = defineStore(
                 navIsCollapsedConfig,
                 dataTableStripedConfig,
                 showPointerOnHoverConfig,
-                showStatusBarConfig,
                 appFontFamilyConfig,
                 lastDarkThemeConfig
             ] = await Promise.all([
@@ -232,7 +230,6 @@ export const useAppearanceSettingsStore = defineStore(
                 configRepository.getBool('VRCX_navIsCollapsed', false),
                 configRepository.getBool('VRCX_dataTableStriped', false),
                 configRepository.getBool('VRCX_showPointerOnHover', false),
-                configRepository.getBool('VRCX_showStatusBar', true),
                 configRepository.getString(
                     'VRCX_fontFamily',
                     APP_FONT_DEFAULT_KEY
@@ -333,7 +330,6 @@ export const useAppearanceSettingsStore = defineStore(
             isNavCollapsed.value = navIsCollapsedConfig;
             isDataTableStriped.value = dataTableStripedConfig;
             showPointerOnHover.value = showPointerOnHoverConfig;
-            showStatusBar.value = showStatusBarConfig;
 
             applyPointerHoverClass();
 
@@ -405,7 +401,10 @@ export const useAppearanceSettingsStore = defineStore(
                 });
             }
             if (randomUserColours.value) {
-                const colour = await getNameColour(userStore.currentUser.id);
+                const colour = await getNameColour(
+                    userStore.currentUser.id,
+                    isDarkMode.value
+                );
                 userStore.setCurrentUserColour(colour);
                 userColourInit();
             } else {
@@ -441,7 +440,7 @@ export const useAppearanceSettingsStore = defineStore(
             for (const [userId, hue] of Object.entries(dictObject)) {
                 const ref = userStore.cachedUsers.get(userId);
                 if (typeof ref !== 'undefined') {
-                    ref.$userColour = HueToHex(hue);
+                    ref.$userColour = HueToHex(hue, isDarkMode.value);
                 }
             }
         }
@@ -460,7 +459,7 @@ export const useAppearanceSettingsStore = defineStore(
             ref.$trustSortNum = trust.trustSortNum;
             if (randomUserColours.value && watchState.isFriendsLoaded) {
                 if (!ref.$userColour) {
-                    getNameColour(ref.id).then((colour) => {
+                    getNameColour(ref.id, isDarkMode.value).then((colour) => {
                         ref.$userColour = colour;
                     });
                 }
@@ -563,13 +562,6 @@ export const useAppearanceSettingsStore = defineStore(
                 'VRCX_showInstanceIdInLocation',
                 showInstanceIdInLocation.value
             );
-        }
-        /**
-         *
-         */
-        function setShowStatusBar() {
-            showStatusBar.value = !showStatusBar.value;
-            configRepository.setBool('VRCX_showStatusBar', showStatusBar.value);
         }
         /**
          *
@@ -1042,7 +1034,10 @@ export const useAppearanceSettingsStore = defineStore(
             if (!randomUserColours.value) {
                 return;
             }
-            const colour = await getNameColour(userStore.currentUser.id);
+            const colour = await getNameColour(
+                userStore.currentUser.id,
+                isDarkMode.value
+            );
             userStore.setCurrentUserColour(colour);
             await userColourInit();
         }
@@ -1099,7 +1094,6 @@ export const useAppearanceSettingsStore = defineStore(
             isNavCollapsed,
             isDataTableStriped,
             showPointerOnHover,
-            showStatusBar,
             tableLimitsDialog,
             TABLE_MAX_SIZE_MIN,
             TABLE_MAX_SIZE_MAX,
@@ -1110,7 +1104,6 @@ export const useAppearanceSettingsStore = defineStore(
             setDisplayVRCPlusIconsAsAvatar,
             setHideNicknames,
             setShowInstanceIdInLocation,
-            setShowStatusBar,
             setIsAgeGatedInstancesVisible,
             setSortFavorites,
             setInstanceUsersSortAlphabetical,

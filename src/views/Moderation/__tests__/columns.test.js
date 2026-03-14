@@ -8,11 +8,15 @@ const mocks = vi.hoisted(() => ({
     te: vi.fn((key) => key === 'view.moderation.filters.block')
 }));
 
-vi.mock('pinia', () => ({
-    storeToRefs: (store) => store
-}));
+vi.mock('pinia', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        storeToRefs: (store) => store
+    };
+});
 
-vi.mock('../../../plugin', () => ({
+vi.mock('../../../plugins', () => ({
     i18n: {
         global: {
             t: (...args) => mocks.t(...args),
@@ -26,9 +30,12 @@ vi.mock('../../../stores', () => ({
         shiftHeld: mocks.shiftHeld
     }),
     useUserStore: () => ({
-        currentUser: mocks.currentUser,
-        showUserDialog: (...args) => mocks.showUserDialog(...args)
+        currentUser: mocks.currentUser
     })
+}));
+
+vi.mock('../../../coordinators/userCoordinator', () => ({
+    showUserDialog: (...args) => mocks.showUserDialog(...args)
 }));
 
 vi.mock('../../../shared/utils', () => ({

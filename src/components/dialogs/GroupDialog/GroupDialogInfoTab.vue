@@ -352,15 +352,16 @@
         getFaviconUrl,
         hasGroupPermission,
         openExternalLink,
-        refreshInstancePlayerCount,
         userImage,
         userStatusClass
     } from '../../../shared/utils';
+    import { refreshInstancePlayerCount } from '../../../coordinators/instanceCoordinator';
     import { useGalleryStore, useGroupStore, useInstanceStore, useLocationStore, useUserStore } from '../../../stores';
     import { useGroupCalendarEvents } from './useGroupCalendarEvents';
 
     import GroupCalendarEventCard from '../../../views/Tools/components/GroupCalendarEventCard.vue';
     import InstanceActionBar from '../../InstanceActionBar.vue';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
 
     const props = defineProps({
         showGroupPostEditDialog: {
@@ -375,7 +376,6 @@
 
     const { t } = useI18n();
 
-    const { showUserDialog } = useUserStore();
     const { groupDialog } = storeToRefs(useGroupStore());
     const { lastLocation } = storeToRefs(useLocationStore());
     const { showFullscreenImageDialog } = useGalleryStore();

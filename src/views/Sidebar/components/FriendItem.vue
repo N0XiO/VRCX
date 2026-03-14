@@ -77,9 +77,11 @@
     import Timer from '@/components/Timer.vue';
 
     import { useAppearanceSettingsStore, useFriendStore, useUserStore } from '../../../stores';
-    import { userImage, userStatusClass } from '../../../shared/utils';
+    import { useUserDisplay } from '../../../composables/useUserDisplay';
 
     import '@/styles/status-icon.css';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
+    import { confirmDeleteFriend } from '../../../coordinators/friendRelationshipCoordinator';
 
     const props = defineProps({
         friend: { type: Object, required: true },
@@ -88,8 +90,8 @@
 
     const { hideNicknames } = storeToRefs(useAppearanceSettingsStore());
     const { isRefreshFriendsLoading, allFavoriteFriendIds } = storeToRefs(useFriendStore());
-    const { confirmDeleteFriend } = useFriendStore();
-    const { showUserDialog } = useUserStore();
+    const { userImage, userStatusClass } = useUserDisplay();
+
     const { t } = useI18n();
 
     const isFriendTraveling = computed(() => props.friend.ref?.location === 'traveling');

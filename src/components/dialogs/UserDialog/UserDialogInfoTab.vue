@@ -483,27 +483,29 @@
         isFriendOnline,
         isRealInstance,
         openExternalLink,
-        refreshInstancePlayerCount,
         timeToText,
         userImage,
         userOnlineFor,
         userOnlineForTimestamp,
         userStatusClass
     } from '../../../shared/utils';
+    import { refreshInstancePlayerCount } from '../../../coordinators/instanceCoordinator';
     import {
         useAdvancedSettingsStore,
         useAppearanceSettingsStore,
         useGalleryStore,
-        useGroupStore,
         useInstanceStore,
         useLocationStore,
         useModalStore,
         useUserStore,
-        useWorldStore
     } from '../../../stores';
+    import { showWorldDialog } from '../../../coordinators/worldCoordinator';
     import { queryRequest, userRequest } from '../../../api';
 
     import InstanceActionBar from '../../InstanceActionBar.vue';
+    import { showUserDialog } from '../../../coordinators/userCoordinator';
+    import { showGroupDialog } from '../../../coordinators/groupCoordinator';
+
 
     const EditNoteAndMemoDialog = defineAsyncComponent(() => import('./EditNoteAndMemoDialog.vue'));
 
@@ -518,9 +520,8 @@
     const { bioLanguage, translationApi, translationApiType } = storeToRefs(useAdvancedSettingsStore());
     const { translateText } = useAdvancedSettingsStore();
     const { userDialog, currentUser } = storeToRefs(useUserStore());
-    const { showUserDialog, toggleSharedConnectionsOptOut, toggleDiscordFriendsOptOut } = useUserStore();
-    const { showWorldDialog } = useWorldStore();
-    const { showGroupDialog } = useGroupStore();
+    const { toggleSharedConnectionsOptOut, toggleDiscordFriendsOptOut } = useUserStore();
+
     const { lastLocation } = storeToRefs(useLocationStore());
     const { showFullscreenImageDialog } = useGalleryStore();
 
@@ -551,7 +552,7 @@
      *
      */
     function onTabActivated() {
-        if (vrchatCredit.value === null) {
+        if (currentUser.value.id === userDialog.value.id && vrchatCredit.value === null) {
             getVRChatCredits();
         }
     }

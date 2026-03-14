@@ -6,7 +6,12 @@
             <ContextMenuTrigger as-child>
                 <div class="flex items-center w-full h-full px-2">
                     <!-- Left section -->
-                    <div class="flex items-center flex-1 min-w-0 [&>*:first-child]:pl-0.5">
+                    <div
+                        class="flex items-center flex-1 min-w-0 overflow-hidden [&>*:first-child]:pl-0.5"
+                        style="
+                            mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+                            -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+                        ">
                         <TooltipWrapper
                             v-if="visibility.proxy"
                             :content="
@@ -74,7 +79,8 @@
                                 </TooltipWrapper>
                                 <div
                                     v-else
-                                    class="flex items-center gap-1 px-2 h-[22px] whitespace-nowrap border-r border-border">
+                                    class="flex items-center gap-1 px-2 h-[22px] whitespace-nowrap border-r border-border cursor-pointer hover:bg-accent"
+                                    @click="vrcStatusStore.openStatusPage()">
                                     <span class="inline-block size-2 rounded-full shrink-0 bg-[#e6a23c]" />
                                     <span class="text-foreground text-[11px]">{{ t('status_bar.servers') }}</span>
                                 </div>
@@ -112,7 +118,7 @@
                     </div>
 
                     <!-- Right section -->
-                    <div class="flex items-center ml-auto [&>*:last-child]:border-r-0 [&>*:last-child]:pr-0.5">
+                    <div class="flex items-center shrink-0 ml-auto [&>*:last-child]:border-r-0 [&>*:last-child]:pr-0.5">
                         <template v-if="visibility.clocks">
                             <Popover
                                 v-for="(clock, idx) in visibleClocks"
@@ -284,7 +290,7 @@
     import { useIntervalFn, useNow } from '@vueuse/core';
     import { TooltipWrapper } from '@/components/ui/tooltip';
     import { useI18n } from 'vue-i18n';
-    import { wsState } from '@/service/websocket';
+    import { wsState } from '@/services/websocket';
 
     import dayjs from 'dayjs';
     import timezone from 'dayjs/plugin/timezone';
@@ -299,7 +305,7 @@
         parseClockOffset
     } from './statusBarUtils';
 
-    import configRepository from '../service/config';
+    import configRepository from '../services/config';
 
     dayjs.extend(utc);
     dayjs.extend(timezone);
@@ -344,9 +350,6 @@
     function toggleVisibility(key) {
         visibility[key] = !visibility[key];
         configRepository.setString(VISIBILITY_KEY, JSON.stringify(visibility));
-        if (key === 'servers') {
-            vrcStatusStore.setStatusBarServersVisible(visibility.servers);
-        }
     }
 
     // --- WebSocket message rate + sparkline ---
@@ -538,12 +541,10 @@
         }
 
         drawSparkline();
-        vrcStatusStore.setStatusBarServersVisible(visibility.servers);
     });
 
     onBeforeUnmount(() => {
         clearTimeout(serversHoverTimer);
-        vrcStatusStore.setStatusBarServersVisible(false);
     });
 
     watch(

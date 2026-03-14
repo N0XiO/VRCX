@@ -352,8 +352,7 @@
                                                 :group="activeRemoteGroup"
                                                 :selected="selectedFavoriteAvatars.includes(favorite.id)"
                                                 :edit-mode="avatarEditMode"
-                                                @toggle-select="toggleAvatarSelection(favorite.id, $event)"
-                                                @click="showAvatarDialog(favorite.id)" />
+                                                @toggle-select="toggleAvatarSelection(favorite.id, $event)" />
                                         </div>
                                     </template>
                                     <div v-else class="flex items-center justify-center text-[13px] h-full">
@@ -385,8 +384,7 @@
                                                 :favorite="favorite"
                                                 :group="activeLocalGroupName"
                                                 is-local-favorite
-                                                :edit-mode="avatarEditMode"
-                                                @click="showAvatarDialog(favorite.id)" />
+                                                :edit-mode="avatarEditMode" />
                                         </div>
                                     </template>
                                     <div v-else class="flex items-center justify-center text-[13px] h-full">
@@ -403,8 +401,7 @@
                                             <FavoritesAvatarLocalHistoryItem
                                                 v-for="favorite in avatarHistory"
                                                 :key="favorite.id"
-                                                :favorite="favorite"
-                                                @click="showAvatarDialog(favorite.id)" />
+                                                :favorite="favorite" />
                                         </div>
                                     </template>
                                     <div v-else class="flex items-center justify-center text-[13px] h-full">
@@ -463,6 +460,15 @@
     import { useFavoritesGroupPanel } from './composables/useFavoritesGroupPanel.js';
     import { useFavoritesLocalGroups } from './composables/useFavoritesLocalGroups.js';
     import { useFavoritesSplitter } from './composables/useFavoritesSplitter.js';
+    import {
+        deleteLocalAvatarFavoriteGroup,
+        renameLocalAvatarFavoriteGroup,
+        newLocalAvatarFavoriteGroup,
+        refreshFavorites,
+        getLocalAvatarFavorites,
+        checkInvalidLocalAvatars,
+        removeInvalidLocalAvatars
+    } from '../../coordinators/favoriteCoordinator';
 
     import AvatarExportDialog from './dialogs/AvatarExportDialog.vue';
     import FavoritesAvatarItem from './components/FavoritesAvatarItem.vue';
@@ -503,21 +509,10 @@
         localAvatarFavoriteGroups,
         avatarImportDialogInput
     } = storeToRefs(favoriteStore);
-    const {
-        showAvatarImportDialog,
-        localAvatarFavGroupLength,
-        deleteLocalAvatarFavoriteGroup,
-        renameLocalAvatarFavoriteGroup,
-        newLocalAvatarFavoriteGroup,
-        localAvatarFavoritesList,
-        refreshFavorites,
-        getLocalAvatarFavorites,
-        handleFavoriteGroup,
-        checkInvalidLocalAvatars,
-        removeInvalidLocalAvatars
-    } = favoriteStore;
+    const { showAvatarImportDialog, localAvatarFavGroupLength, localAvatarFavoritesList, handleFavoriteGroup } =
+        favoriteStore;
     const { avatarHistory } = storeToRefs(useAvatarStore());
-    const { promptClearAvatarHistory, showAvatarDialog, applyAvatar } = useAvatarStore();
+    import { promptClearAvatarHistory, showAvatarDialog, applyAvatar } from '../../coordinators/avatarCoordinator';
     const { isLocalUserVrcPlusSupporter } = storeToRefs(useUserStore());
     const { t } = useI18n();
 
