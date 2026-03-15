@@ -88,7 +88,6 @@ function removeWhitespace(a) {
     return a.replace(/\s/g, '');
 }
 
-// ── Locale-aware string search ──────────────────────────────────────
 
 function localeIncludes(str, search, comparer) {
     if (search === '') return true;
@@ -104,51 +103,78 @@ function localeIncludes(str, search, comparer) {
     return false;
 }
 
-function matchName(name, query, comparer) {
-    if (!name || !query) return false;
-    const cleanQuery = removeWhitespace(query);
-    if (!cleanQuery) return false;
-    const cleanName = removeConfusables(name);
+function matchName(name, cleanQuery, comparer, normalizedName) {
+    if (!name || !cleanQuery) return false;
+    const cleanName = normalizedName || removeConfusables(name);
     if (localeIncludes(cleanName, cleanQuery, comparer)) return true;
     return localeIncludes(name, cleanQuery, comparer);
 }
 
-function isPrefixMatch(name, query, comparer) {
-    if (!name || !query) return false;
-    const cleanQuery = removeWhitespace(query);
-    if (!cleanQuery) return false;
+function isPrefixMatch(name, cleanQuery, comparer) {
+    if (!name || !cleanQuery) return false;
     return (
         comparer.compare(name.substring(0, cleanQuery.length), cleanQuery) === 0
     );
 }
 
-// ── Index data (updated from main thread) ───────────────────────────
 
-let indexedFriends = [];    // { id, name, memo, note, imageUrl }
-let indexedAvatars = [];    // { id, name, authorId, imageUrl }
-let indexedWorlds = [];     // { id, name, authorId, imageUrl }
-let indexedGroups = [];     // { id, name, ownerId, imageUrl }
+let indexedFriends = []; // { id, name, memo, note, imageUrl }
+let indexedAvatars = []; // { id, name, authorId, imageUrl }
+let indexedWorlds = []; // { id, name, authorId, imageUrl }
+let indexedGroups = []; // { id, name, ownerId, imageUrl }
 let indexedFavAvatars = []; // { id, name, imageUrl }
-let indexedFavWorlds = [];  // { id, name, imageUrl }
+let indexedFavWorlds = []; // { id, name, imageUrl }
 
 /**
  * Update the search index with fresh data snapshots.
+ * Pre-computes normalized names to avoid per-search confusables overhead.
+ * @param payload
  */
 function updateIndex(payload) {
-    if (payload.friends) indexedFriends = payload.friends;
-    if (payload.avatars) indexedAvatars = payload.avatars;
-    if (payload.worlds) indexedWorlds = payload.worlds;
-    if (payload.groups) indexedGroups = payload.groups;
-    if (payload.favAvatars) indexedFavAvatars = payload.favAvatars;
-    if (payload.favWorlds) indexedFavWorlds = payload.favWorlds;
+    if (payload.friends) {
+        indexedFriends = payload.friends;
+        for (const f of indexedFriends) {
+            f._normalized = f.name ? removeConfusables(f.name) : '';
+        }
+    }
+    if (payload.avatars) {
+        indexedAvatars = payload.avatars;
+        for (const a of indexedAvatars) {
+            a._normalized = a.name ? removeConfusables(a.name) : '';
+        }
+    }
+    if (payload.worlds) {
+        indexedWorlds = payload.worlds;
+        for (const w of indexedWorlds) {
+            w._normalized = w.name ? removeConfusables(w.name) : '';
+        }
+    }
+    if (payload.groups) {
+        indexedGroups = payload.groups;
+        for (const g of indexedGroups) {
+            g._normalized = g.name ? removeConfusables(g.name) : '';
+        }
+    }
+    if (payload.favAvatars) {
+        indexedFavAvatars = payload.favAvatars;
+        for (const a of indexedFavAvatars) {
+            a._normalized = a.name ? removeConfusables(a.name) : '';
+        }
+    }
+    if (payload.favWorlds) {
+        indexedFavWorlds = payload.favWorlds;
+        for (const w of indexedFavWorlds) {
+            w._normalized = w.name ? removeConfusables(w.name) : '';
+        }
+    }
 }
 
 // ── Search functions ────────────────────────────────────────────────
 
-function searchFriends(query, comparer, limit = 10) {
+function searchFriends(query, cleanQuery, comparer, limit = 10) {
     const results = [];
     for (const ctx of indexedFriends) {
-        let match = matchName(ctx.name, query, comparer);
+        let match = matchName(ctx.name, cleanQuery, comparer, ctx._normalized);
         let matchedField = match ? 'name' : null;
         if (!match && ctx.memo) {
             match = localeIncludes(ctx.memo, query, comparer);
@@ -170,23 +196,37 @@ function searchFriends(query, comparer, limit = 10) {
             });
         }
     }
+    // Pre-compute prefix flags to avoid repeated Collator calls in sort
+    for (const r of results) {
+        r._isPrefix = isPrefixMatch(r.name, cleanQuery, comparer);
+    }
     results.sort((a, b) => {
-        const aPrefix = isPrefixMatch(a.name, query, comparer);
-        const bPrefix = isPrefixMatch(b.name, query, comparer);
-        if (aPrefix && !bPrefix) return -1;
-        if (bPrefix && !aPrefix) return 1;
+        if (a._isPrefix && !b._isPrefix) return -1;
+        if (b._isPrefix && !a._isPrefix) return 1;
         return comparer.compare(a.name, b.name);
     });
     if (results.length > limit) results.length = limit;
+    // Clean up internal sort field before returning
+    for (const r of results) {
+        delete r._isPrefix;
+    }
     return results;
 }
 
-function searchItems(query, items, type, comparer, ownerKey, ownerId, limit = 10) {
+function searchItems(
+    cleanQuery,
+    items,
+    type,
+    comparer,
+    ownerKey,
+    ownerId,
+    limit = 10
+) {
     const results = [];
     for (const ref of items) {
         if (!ref || !ref.name) continue;
         if (ownerId && ref[ownerKey] !== ownerId) continue;
-        if (matchName(ref.name, query, comparer)) {
+        if (matchName(ref.name, cleanQuery, comparer, ref._normalized)) {
             results.push({
                 id: ref.id,
                 name: ref.name,
@@ -195,14 +235,20 @@ function searchItems(query, items, type, comparer, ownerKey, ownerId, limit = 10
             });
         }
     }
+    // Pre-compute prefix flags to avoid repeated Collator calls in sort
+    for (const r of results) {
+        r._isPrefix = isPrefixMatch(r.name, cleanQuery, comparer);
+    }
     results.sort((a, b) => {
-        const aPrefix = isPrefixMatch(a.name, query, comparer);
-        const bPrefix = isPrefixMatch(b.name, query, comparer);
-        if (aPrefix && !bPrefix) return -1;
-        if (bPrefix && !aPrefix) return 1;
+        if (a._isPrefix && !b._isPrefix) return -1;
+        if (b._isPrefix && !a._isPrefix) return 1;
         return comparer.compare(a.name, b.name);
     });
     if (results.length > limit) results.length = limit;
+    // Clean up internal sort field before returning
+    for (const r of results) {
+        delete r._isPrefix;
+    }
     return results;
 }
 
@@ -226,18 +272,63 @@ function handleSearch(payload) {
         return;
     }
 
-    const comparer = new Intl.Collator(
-        (language || 'en').replace('_', '-'),
-        { usage: 'search', sensitivity: 'base' }
-    );
+    const comparer = new Intl.Collator((language || 'en').replace('_', '-'), {
+        usage: 'search',
+        sensitivity: 'base'
+    });
 
-    const friends = searchFriends(query, comparer);
-    const ownAvatars = searchItems(query, indexedAvatars, 'avatar', comparer, 'authorId', currentUserId);
-    const favAvatars = searchItems(query, indexedFavAvatars, 'avatar', comparer, null, null);
-    const ownWorlds = searchItems(query, indexedWorlds, 'world', comparer, 'authorId', currentUserId);
-    const favWorlds = searchItems(query, indexedFavWorlds, 'world', comparer, null, null);
-    const ownGroups = searchItems(query, indexedGroups, 'group', comparer, 'ownerId', currentUserId);
-    const joinedGroups = searchItems(query, indexedGroups, 'group', comparer, null, null);
+    // Pre-compute cleaned query once for all name searches
+    const cleanQuery = removeWhitespace(query);
+
+    const friends = searchFriends(query, cleanQuery, comparer);
+    const ownAvatars = searchItems(
+        cleanQuery,
+        indexedAvatars,
+        'avatar',
+        comparer,
+        'authorId',
+        currentUserId
+    );
+    const favAvatars = searchItems(
+        cleanQuery,
+        indexedFavAvatars,
+        'avatar',
+        comparer,
+        null,
+        null
+    );
+    const ownWorlds = searchItems(
+        cleanQuery,
+        indexedWorlds,
+        'world',
+        comparer,
+        'authorId',
+        currentUserId
+    );
+    const favWorlds = searchItems(
+        cleanQuery,
+        indexedFavWorlds,
+        'world',
+        comparer,
+        null,
+        null
+    );
+    const ownGroups = searchItems(
+        cleanQuery,
+        indexedGroups,
+        'group',
+        comparer,
+        'ownerId',
+        currentUserId
+    );
+    const joinedGroups = searchItems(
+        cleanQuery,
+        indexedGroups,
+        'group',
+        comparer,
+        null,
+        null
+    );
 
     // Deduplicate favorites against own
     const ownAvatarIds = new Set(ownAvatars.map((r) => r.id));
@@ -245,7 +336,9 @@ function handleSearch(payload) {
     const ownWorldIds = new Set(ownWorlds.map((r) => r.id));
     const dedupedFavWorlds = favWorlds.filter((r) => !ownWorldIds.has(r.id));
     const ownGroupIds = new Set(ownGroups.map((r) => r.id));
-    const dedupedJoinedGroups = joinedGroups.filter((r) => !ownGroupIds.has(r.id));
+    const dedupedJoinedGroups = joinedGroups.filter(
+        (r) => !ownGroupIds.has(r.id)
+    );
 
     self.postMessage({
         type: 'searchResult',
@@ -262,7 +355,6 @@ function handleSearch(payload) {
     });
 }
 
-// ── Message handler ─────────────────────────────────────────────────
 
 self.addEventListener('message', (event) => {
     const { type, payload } = event.data;

@@ -4,6 +4,7 @@ import { database } from '../services/database';
 import { useFeedStore } from '../stores/feed';
 import { useFriendStore } from '../stores/friend';
 import { useNotificationStore } from '../stores/notification';
+import { syncFriendSearchIndex } from './searchIndexCoordinator';
 import { useSharedFeedStore } from '../stores/sharedFeed';
 import { useUserStore } from '../stores/user';
 import { userRequest } from '../api';
@@ -117,8 +118,10 @@ export async function runUpdateFriendDelayedCheckFlow(
     }
     if (ref?.displayName) {
         ctx.name = ref.displayName;
+        syncFriendSearchIndex(ctx);
     }
     ctx.isVIP = isVIP;
+    friendStore.reindexSortedFriend(ctx);
 }
 
 /**
@@ -205,7 +208,9 @@ export async function runUpdateFriendFlow(
         }
         if (typeof ref !== 'undefined' && ctx.name !== ref.displayName) {
             ctx.name = ref.displayName;
+            syncFriendSearchIndex(ctx);
         }
+        friendStore.reindexSortedFriend(ctx);
         return;
     }
     if (
@@ -216,6 +221,7 @@ export async function runUpdateFriendFlow(
         ctx.isVIP = isVIP;
         if (typeof ref !== 'undefined') {
             ctx.name = ref.displayName;
+            syncFriendSearchIndex(ctx);
         }
         if (!watchState.isFriendsLoaded) {
             await runUpdateFriendDelayedCheckFlow(
@@ -244,12 +250,14 @@ export async function runUpdateFriendFlow(
             previousLocationAt: $location_at
         });
         ctx.pendingOffline = true;
+        friendStore.reindexSortedFriend(ctx);
         return;
     }
     ctx.ref = ref;
     ctx.isVIP = isVIP;
     if (typeof ref !== 'undefined') {
         ctx.name = ref.displayName;
+        syncFriendSearchIndex(ctx);
         await runUpdateFriendDelayedCheckFlow(
             ctx,
             ctx.ref.state,
@@ -257,6 +265,8 @@ export async function runUpdateFriendFlow(
             $location_at,
             { now, nowIso }
         );
+    } else {
+        friendStore.reindexSortedFriend(ctx);
     }
 }
 

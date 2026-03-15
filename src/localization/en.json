@@ -101,7 +101,6 @@
         },
         "panel": {
             "not_selected": "No Panel Selected",
-            "replace": "Replace Panel",
             "select": "Select Panel",
             "not_configured": "Panel Not Configured"
         },
@@ -118,7 +117,7 @@
             "config": {
                 "filters": "Event Types",
                 "columns": "Columns",
-                "show_detail": "Show Detail",
+                "detail": "Detail",
                 "show_type": "Show Type"
             },
             "no_data": "No data",
@@ -188,7 +187,8 @@
             "tab_group": "Group",
             "tab_other": "Other",
             "past_notifications": "Last 24 hours",
-            "no_new_notifications": "No new notifications in the past 24 hours"
+            "no_new_notifications": "No new notifications in the past 24 hours",
+            "no_unseen_notifications": "No unread notifications"
         }
     },
     "view": {
@@ -704,7 +704,7 @@
                     "bio_language": "Target Language",
                     "theme_mode": "Theme",
                     "font_family": "Font",
-                    "font_family_tooltip": "Only the system font affects CJK characters",
+                    "cjk_font_pack": "CJK Font",
                     "font_family_inter": "Inter",
                     "font_family_noto_sans": "Noto Sans",
                     "font_family_source_sans_3": "Source Sans 3",
@@ -714,6 +714,12 @@
                     "font_family_roboto": "Roboto",
                     "font_family_fantasque_sans_mono": "Fantasque Sans Mono",
                     "font_family_system_ui": "System Font",
+                    "font_family_custom": "Custom",
+                    "font_family_custom_dialog_title": "Custom Font Family",
+                    "font_family_custom_dialog_description": "Enter a valid CSS font-family value",
+                    "font_family_custom_invalid": "Invalid font-family. Use comma-separated font names, e.g. 'My Font', Arial, sans-serif",
+                    "cjk_font_pack_noto": "Noto Sans CJK",
+                    "cjk_font_pack_pht": "PuHuiTi CJK",
                     "theme_mode_system": "System",
                     "theme_mode_light": "Light",
                     "theme_mode_dark": "Dark",
@@ -2714,6 +2720,10 @@
         "game": "Game",
         "game_running": "VRChat is running",
         "game_stopped": "VRChat is not running",
+        "game_started_at": "Started",
+        "game_session_duration": "Duration",
+        "game_last_session": "Last Session",
+        "game_last_offline": "Offline Since",
         "servers": "Servers",
         "servers_ok": "VRChat servers are operational",
         "servers_issue": "VRChat Server Issues",

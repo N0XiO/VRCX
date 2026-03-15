@@ -1,25 +1,19 @@
-import { ref, watch, computed } from 'vue';
+import { computed, effectScope, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
-import { useAvatarStore } from './avatar';
-import { useFavoriteStore } from './favorite';
 import { useFriendStore } from './friend';
-import { useGroupStore } from './group';
+import { useSearchIndexStore } from './searchIndex';
 import { useUserStore } from './user';
-import { useWorldStore } from './world';
 import { showGroupDialog } from '../coordinators/groupCoordinator';
 import { showWorldDialog } from '../coordinators/worldCoordinator';
 import { showAvatarDialog } from '../coordinators/avatarCoordinator';
 import { showUserDialog } from '../coordinators/userCoordinator';
 
-import SearchWorker from './searchWorker.js?worker';
+import QuickSearchWorker from './quickSearchWorker.js?worker&inline';
 
-export const useGlobalSearchStore = defineStore('GlobalSearch', () => {
+export const useQuickSearchStore = defineStore('QuickSearch', () => {
     const friendStore = useFriendStore();
-    const favoriteStore = useFavoriteStore();
-    const avatarStore = useAvatarStore();
-    const worldStore = useWorldStore();
-    const groupStore = useGroupStore();
     const userStore = useUserStore();
+    const searchIndexStore = useSearchIndexStore();
 
     const isOpen = ref(false);
     const query = ref('');
@@ -27,13 +21,20 @@ export const useGlobalSearchStore = defineStore('GlobalSearch', () => {
     // Worker instance (lazy)
     let worker = null;
     let indexUpdateTimer = null;
+    let indexWatchScope = null;
 
     function getWorker() {
         if (!worker) {
-            worker = new SearchWorker();
+            worker = new QuickSearchWorker();
             worker.onmessage = handleWorkerMessage;
         }
         return worker;
+    }
+
+    function disposeWorker() {
+        if (!worker) return;
+        worker.terminate();
+        worker = null;
     }
 
     // Search results (updated from worker messages)
@@ -58,131 +59,48 @@ export const useGlobalSearchStore = defineStore('GlobalSearch', () => {
 
     const currentUserId = computed(() => userStore.currentUser?.id);
 
-    watch(isOpen, (open) => {
-        if (!open) {
-            query.value = '';
-            clearResults();
-        }
-    });
-
     // Send index update to worker when data changes
     function scheduleIndexUpdate() {
+        if (!isOpen.value) return;
         if (indexUpdateTimer) clearTimeout(indexUpdateTimer);
         indexUpdateTimer = setTimeout(() => {
             indexUpdateTimer = null;
+            if (!isOpen.value) return;
             sendIndexUpdate();
+            if (query.value && query.value.length >= 2) {
+                dispatchSearch();
+            }
         }, 200);
     }
 
     function sendIndexUpdate() {
         const w = getWorker();
-
-        const friends = [];
-        for (const ctx of friendStore.friends.values()) {
-            if (typeof ctx.ref === 'undefined') continue;
-            friends.push({
-                id: ctx.id,
-                name: ctx.name,
-                memo: ctx.memo || '',
-                note: ctx.ref.note || '',
-                imageUrl: ctx.ref.currentAvatarThumbnailImageUrl
-            });
-        }
-
-        const avatars = [];
-        for (const ref of avatarStore.cachedAvatars.values()) {
-            if (!ref || !ref.name) continue;
-            avatars.push({
-                id: ref.id,
-                name: ref.name,
-                authorId: ref.authorId,
-                imageUrl: ref.thumbnailImageUrl || ref.imageUrl
-            });
-        }
-
-        const worlds = [];
-        for (const ref of worldStore.cachedWorlds.values()) {
-            if (!ref || !ref.name) continue;
-            worlds.push({
-                id: ref.id,
-                name: ref.name,
-                authorId: ref.authorId,
-                imageUrl: ref.thumbnailImageUrl || ref.imageUrl
-            });
-        }
-
-        const groups = [];
-        for (const ref of groupStore.currentUserGroups.values()) {
-            if (!ref || !ref.name) continue;
-            groups.push({
-                id: ref.id,
-                name: ref.name,
-                ownerId: ref.ownerId,
-                imageUrl: ref.iconUrl || ref.bannerUrl
-            });
-        }
-
-        const favAvatars = [];
-        for (const ctx of favoriteStore.favoriteAvatars) {
-            if (!ctx?.ref?.name) continue;
-            favAvatars.push({
-                id: ctx.ref.id,
-                name: ctx.ref.name,
-                imageUrl: ctx.ref.thumbnailImageUrl || ctx.ref.imageUrl
-            });
-        }
-
-        const favWorlds = [];
-        for (const ctx of favoriteStore.favoriteWorlds) {
-            if (!ctx?.ref?.name) continue;
-            favWorlds.push({
-                id: ctx.ref.id,
-                name: ctx.ref.name,
-                imageUrl: ctx.ref.thumbnailImageUrl || ctx.ref.imageUrl
-            });
-        }
-
-        w.postMessage({
-            type: 'updateIndex',
-            payload: { friends, avatars, worlds, groups, favAvatars, favWorlds }
-        });
+        const payload = searchIndexStore.getSnapshot();
+        w.postMessage({ type: 'updateIndex', payload });
     }
 
-    watch(
-        () => friendStore.friends,
-        () => scheduleIndexUpdate(),
-        { deep: true }
-    );
+    function stopIndexWatchers() {
+        if (indexUpdateTimer) {
+            clearTimeout(indexUpdateTimer);
+            indexUpdateTimer = null;
+        }
+        if (indexWatchScope) {
+            indexWatchScope.stop();
+            indexWatchScope = null;
+        }
+    }
 
-    watch(
-        () => avatarStore.cachedAvatars,
-        () => scheduleIndexUpdate(),
-        { deep: true }
-    );
+    function startIndexWatchers() {
+        if (indexWatchScope) return;
 
-    watch(
-        () => worldStore.cachedWorlds,
-        () => scheduleIndexUpdate(),
-        { deep: true }
-    );
-
-    watch(
-        () => groupStore.currentUserGroups,
-        () => scheduleIndexUpdate(),
-        { deep: true }
-    );
-
-    watch(
-        () => favoriteStore.favoriteAvatars,
-        () => scheduleIndexUpdate(),
-        { deep: true }
-    );
-
-    watch(
-        () => favoriteStore.favoriteWorlds,
-        () => scheduleIndexUpdate(),
-        { deep: true }
-    );
+        indexWatchScope = effectScope();
+        indexWatchScope.run(() => {
+            watch(
+                () => searchIndexStore.version,
+                () => scheduleIndexUpdate()
+            );
+        });
+    }
 
     let searchSeq = 0;
 
@@ -208,7 +126,25 @@ export const useGlobalSearchStore = defineStore('GlobalSearch', () => {
 
     watch(query, dispatchSearch);
     watch(currentUserId, () => {
-        if (query.value && query.value.length >= 2) dispatchSearch();
+        if (query.value && query.value.length >= 2) {
+            dispatchSearch();
+        }
+    });
+
+    watch(isOpen, (open) => {
+        if (open) {
+            startIndexWatchers();
+            sendIndexUpdate();
+            if (query.value && query.value.length >= 2) {
+                dispatchSearch();
+            }
+            return;
+        }
+
+        query.value = '';
+        clearResults();
+        stopIndexWatchers();
+        disposeWorker();
     });
 
     function handleWorkerMessage(event) {
@@ -241,9 +177,7 @@ export const useGlobalSearchStore = defineStore('GlobalSearch', () => {
         joinedGroupResults.value = [];
     }
 
-
     function open() {
-        sendIndexUpdate();
         isOpen.value = true;
     }
 

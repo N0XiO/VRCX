@@ -24,6 +24,7 @@ import { useAvatarProviderStore } from '../stores/avatarProvider';
 import { useAvatarStore } from '../stores/avatar';
 import { useFavoriteStore } from '../stores/favorite';
 import { useModalStore } from '../stores/modal';
+import { syncAvatarSearchIndex, removeAvatarSearchIndex } from './searchIndexCoordinator';
 import { useUiStore } from '../stores/ui';
 import { useUserStore } from '../stores/user';
 import { useVRCXUpdaterStore } from '../stores/vrcxUpdater';
@@ -67,6 +68,7 @@ export function applyAvatar(json) {
         database.addAvatarToCache(avatarRef);
     }
     patchAvatarFromEvent(ref);
+    syncAvatarSearchIndex(ref);
     return ref;
 }
 
@@ -232,7 +234,8 @@ export function promptClearAvatarHistory() {
     modalStore
         .confirm({
             description: t('confirm.clear_avatar_history'),
-            title: 'Confirm'
+            title: t('confirm.title'),
+            destructive: true
         })
         .then(({ ok }) => {
             if (!ok) return;
@@ -472,7 +475,7 @@ export function selectAvatarWithConfirmation(id) {
     modalStore
         .confirm({
             description: t('confirm.select_avatar'),
-            title: 'Confirm'
+            title: t('confirm.title')
         })
         .then(({ ok }) => {
             if (!ok) return;
@@ -630,4 +633,13 @@ export async function preloadOwnAvatars() {
             }
         }
     });
+}
+
+/**
+ * @param {string} id
+ */
+export function removeAvatarFromCache(id) {
+    const avatarStore = useAvatarStore();
+    avatarStore.cachedAvatars.delete(id);
+    removeAvatarSearchIndex(id);
 }

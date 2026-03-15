@@ -18,8 +18,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('pinia', async (i) => ({ ...(await i()), storeToRefs: (s) => s }));
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (k) => k }) }));
-vi.mock('../../stores/globalSearch', () => ({
-    useGlobalSearchStore: () => ({
+vi.mock('../../stores/quickSearch', () => ({
+    useQuickSearchStore: () => ({
         isOpen: mocks.isOpen,
         query: mocks.query,
         friendResults: mocks.friendResults,
@@ -33,21 +33,39 @@ vi.mock('../../stores/globalSearch', () => ({
         selectResult: (...args) => mocks.selectResult(...args)
     })
 }));
-vi.mock('../../composables/useUserDisplay', () => ({ useUserDisplay: () => ({ userImage: (...a) => mocks.userImage(...a) }) }));
-vi.mock('../GlobalSearchSync.vue', () => ({ default: { template: '<div data-testid="sync" />' } }));
-vi.mock('@/components/ui/dialog', () => ({ Dialog: { template: '<div><slot /></div>' }, DialogContent: { template: '<div><slot /></div>' }, DialogHeader: { template: '<div><slot /></div>' }, DialogTitle: { template: '<div><slot /></div>' }, DialogDescription: { template: '<div><slot /></div>' } }));
+vi.mock('../../composables/useUserDisplay', () => ({
+    useUserDisplay: () => ({ userImage: (...a) => mocks.userImage(...a) })
+}));
+vi.mock('../QuickSearchSync.vue', () => ({
+    default: { template: '<div data-testid="sync" />' }
+}));
+vi.mock('@/components/ui/dialog', () => ({
+    Dialog: { template: '<div><slot /></div>' },
+    DialogContent: { template: '<div><slot /></div>' },
+    DialogHeader: { template: '<div><slot /></div>' },
+    DialogTitle: { template: '<div><slot /></div>' },
+    DialogDescription: { template: '<div><slot /></div>' }
+}));
 vi.mock('@/components/ui/command', () => ({
     Command: { template: '<div><slot /></div>' },
     CommandInput: { template: '<input />' },
     CommandList: { template: '<div><slot /></div>' },
     CommandGroup: { template: '<div><slot /></div>' },
-    CommandItem: { emits: ['select'], template: '<button data-testid="cmd-item" @click="$emit(\'select\')"><slot /></button>' }
+    CommandItem: {
+        emits: ['select'],
+        template:
+            '<button data-testid="cmd-item" @click="$emit(\'select\')"><slot /></button>'
+    }
 }));
-vi.mock('lucide-vue-next', () => ({ Globe: { template: '<i />' }, Image: { template: '<i />' }, Users: { template: '<i />' } }));
+vi.mock('lucide-vue-next', () => ({
+    Globe: { template: '<i />' },
+    Image: { template: '<i />' },
+    Users: { template: '<i />' }
+}));
 
-import GlobalSearchDialog from '../GlobalSearchDialog.vue';
+import QuickSearchDialog from '../QuickSearchDialog.vue';
 
-describe('GlobalSearchDialog.vue', () => {
+describe('QuickSearchDialog.vue', () => {
     beforeEach(() => {
         mocks.selectResult.mockClear();
         mocks.query.value = '';
@@ -56,7 +74,7 @@ describe('GlobalSearchDialog.vue', () => {
     });
 
     it('renders search dialog structure', () => {
-        const wrapper = mount(GlobalSearchDialog);
+        const wrapper = mount(QuickSearchDialog);
         expect(wrapper.text()).toContain('side_panel.search_placeholder');
         expect(wrapper.find('[data-testid="sync"]').exists()).toBe(true);
     });

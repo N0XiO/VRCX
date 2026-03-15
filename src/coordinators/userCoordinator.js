@@ -53,6 +53,8 @@ import { useModerationStore } from '../stores/moderation';
 import { useNotificationStore } from '../stores/notification';
 import { usePhotonStore } from '../stores/photon';
 import { useSearchStore } from '../stores/search';
+import { syncFriendSearchIndex } from './searchIndexCoordinator';
+import { removeAvatarFromCache } from './avatarCoordinator';
 import { useSharedFeedStore } from '../stores/sharedFeed';
 import { useUiStore } from '../stores/ui';
 import { useUserStore } from '../stores/user';
@@ -78,11 +80,14 @@ export function applyUser(json) {
         cachedUsers,
         currentTravelers,
         customUserTags,
+        rebuildCachedUserDisplayNameIndex,
+        setCachedUser,
         state,
         userDialog
     } = userStore;
 
     let ref = cachedUsers.get(json.id);
+    let previousDisplayName = '';
     let hasPropChanged = false;
     let changedProps = {};
     sanitizeUserJson(json, getRobotUrl());
@@ -109,18 +114,24 @@ export function applyUser(json) {
             ref.$customTag = '';
             ref.$customTagColour = '';
         }
-        evictMapCache(
+        const { deletedCount } = evictMapCache(
             cachedUsers,
             friendStore.friends.size + 300,
             (_value, key) => friendStore.friends.has(key),
             { logLabel: 'User cache cleanup' }
         );
-        cachedUsers.set(ref.id, ref);
+        if (deletedCount > 0) {
+            setCachedUser(ref, '', { skipIndex: true });
+            rebuildCachedUserDisplayNameIndex();
+        } else {
+            setCachedUser(ref);
+        }
         runUpdateFriendFlow(ref.id);
     } else {
         if (json.state !== 'online') {
             runUpdateFriendFlow(ref.id, json.state);
         }
+        previousDisplayName = ref.displayName;
         const { hasPropChanged: _hasPropChanged, changedProps: _changedProps } =
             diffObjectProps(ref, json, arraysMatch);
         for (const prop in json) {
@@ -128,6 +139,7 @@ export function applyUser(json) {
                 ref[prop] = json[prop];
             }
         }
+        setCachedUser(ref, previousDisplayName);
         hasPropChanged = _hasPropChanged;
         changedProps = _changedProps;
     }
@@ -181,6 +193,8 @@ export function applyUser(json) {
     if (friendCtx) {
         friendCtx.ref = ref;
         friendCtx.name = ref.displayName;
+        syncFriendSearchIndex(friendCtx);
+        friendStore.reindexSortedFriend(friendCtx);
     }
     if (ref.id === currentUser.id) {
         if (ref.status) {
@@ -306,6 +320,7 @@ export function showUserDialog(userId) {
                 } else {
                     ref.$nickName = '';
                 }
+                syncFriendSearchIndex(ref);
             }
         }
     });
@@ -583,7 +598,7 @@ export async function refreshUserDialogAvatars(fileId) {
     };
     for (const ref of avatarStore.cachedAvatars.values()) {
         if (ref.authorId === D.id) {
-            avatarStore.cachedAvatars.delete(ref.id);
+            removeAvatarFromCache(ref.id);
         }
     }
     const map = new Map();
@@ -632,7 +647,11 @@ export async function lookupUser(ref) {
     if (!ref.displayName || ref.displayName.substring(0, 3) === 'ID:') {
         return;
     }
-    const found = findUserByDisplayName(userStore.cachedUsers, ref.displayName);
+    const found = findUserByDisplayName(
+        userStore.cachedUsers,
+        ref.displayName,
+        userStore.cachedUserIdsByDisplayName
+    );
     if (found) {
         showUserDialog(found.id);
         return;

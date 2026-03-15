@@ -1,3 +1,5 @@
+import { removeAvatarFromCache } from './avatarCoordinator';
+import { removeWorldFromCache } from './worldCoordinator';
 import { useAvatarStore } from '../stores/avatar';
 import { useFavoriteStore } from '../stores/favorite';
 import { useFriendStore } from '../stores/friend';
@@ -8,6 +10,7 @@ import { useLocationStore } from '../stores/location';
 import { useUserStore } from '../stores/user';
 import { useWorldStore } from '../stores/world';
 import { failedGetRequests } from '../services/request';
+
 
 /**
  * Clears caches across multiple stores while preserving data that is
@@ -32,7 +35,7 @@ export function clearVRCXCache() {
             !locationStore.lastLocation.playerList.has(ref.id) &&
             id !== userStore.currentUser.id
         ) {
-            userStore.cachedUsers.delete(id);
+            userStore.deleteCachedUser(id);
         }
     });
     worldStore.cachedWorlds.forEach((ref, id) => {
@@ -41,7 +44,7 @@ export function clearVRCXCache() {
             ref.authorId !== userStore.currentUser.id &&
             !favoriteStore.localWorldFavoritesList.includes(id)
         ) {
-            worldStore.cachedWorlds.delete(id);
+            removeWorldFromCache(id);
         }
     });
     avatarStore.cachedAvatars.forEach((ref, id) => {
@@ -51,7 +54,7 @@ export function clearVRCXCache() {
             !favoriteStore.localAvatarFavoritesList.includes(id) &&
             !avatarStore.avatarHistory.includes(id)
         ) {
-            avatarStore.cachedAvatars.delete(id);
+            removeAvatarFromCache(id);
         }
     });
     groupStore.cachedGroups.forEach((ref, id) => {

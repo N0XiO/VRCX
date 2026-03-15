@@ -41,6 +41,18 @@ export async function runGameRunningChangedFlow(isGameRunning) {
         userStore.markCurrentUserGameStarted();
     } else {
         await configRepository.setBool('isGameNoVR', gameStore.isGameNoVR);
+        // persist last session data before markCurrentUserGameStopped resets $online_for
+        const sessionStart = userStore.currentUser.$online_for;
+        const offlineAt = Date.now();
+        if (sessionStart && sessionStart > 0) {
+            const sessionDuration = offlineAt - sessionStart;
+            // set store state synchronously so UI reads it immediately
+            gameStore.setLastSession(sessionDuration, offlineAt);
+            await Promise.all([
+                configRepository.setString('VRCX_lastGameSessionMs', String(sessionDuration)),
+                configRepository.setString('VRCX_lastGameOfflineAt', String(offlineAt))
+            ]);
+        }
         userStore.markCurrentUserGameStopped();
         instanceStore.removeAllQueuedInstances();
         runAutoVRChatCacheManagementFlow();
@@ -83,6 +95,19 @@ export async function runUpdateIsGameRunningFlow(
         console.log('isSteamVRRunning:', isSteamVRRunningArg);
     }
     vrStore.updateOpenVR();
+}
+
+/**
+ * Orchestrates the HMD AFK state update from IPC.
+ * @param {boolean} isHmdAfkArg HMD AFK flag from VR polling.
+ */
+export function runUpdateIsHmdAfkFlow(isHmdAfkArg) {
+    const gameStore = useGameStore();
+
+    if (isHmdAfkArg !== gameStore.isHmdAfk) {
+        gameStore.setIsHmdAfk(isHmdAfkArg);
+        console.log('isHmdAfk', isHmdAfkArg);
+    }
 }
 
 /**

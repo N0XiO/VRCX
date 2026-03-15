@@ -5,14 +5,11 @@ import { nextTick, reactive } from 'vue';
 const mocks = vi.hoisted(() => ({
     workerInstances: [],
     friendStore: null,
-    favoriteStore: null,
-    avatarStore: null,
-    worldStore: null,
-    groupStore: null,
+    searchIndexStore: null,
     userStore: null
 }));
 
-vi.mock('../searchWorker.js?worker', () => ({
+vi.mock('../quickSearchWorker.js?worker&inline', () => ({
     default: class MockSearchWorker {
         constructor() {
             this.onmessage = null;
@@ -29,17 +26,8 @@ vi.mock('../searchWorker.js?worker', () => ({
 vi.mock('../friend', () => ({
     useFriendStore: () => mocks.friendStore
 }));
-vi.mock('../favorite', () => ({
-    useFavoriteStore: () => mocks.favoriteStore
-}));
-vi.mock('../avatar', () => ({
-    useAvatarStore: () => mocks.avatarStore
-}));
-vi.mock('../world', () => ({
-    useWorldStore: () => mocks.worldStore
-}));
-vi.mock('../group', () => ({
-    useGroupStore: () => mocks.groupStore
+vi.mock('../searchIndex', () => ({
+    useSearchIndexStore: () => mocks.searchIndexStore
 }));
 vi.mock('../user', () => ({
     useUserStore: () => mocks.userStore
@@ -50,23 +38,51 @@ const showAvatarDialog = vi.fn();
 const showWorldDialog = vi.fn();
 const showGroupDialog = vi.fn();
 
-vi.mock('../../coordinators/userCoordinator', () => ({ showUserDialog: (...args) => showUserDialog(...args) }));
-vi.mock('../../coordinators/avatarCoordinator', () => ({ showAvatarDialog: (...args) => showAvatarDialog(...args) }));
-vi.mock('../../coordinators/worldCoordinator', () => ({ showWorldDialog: (...args) => showWorldDialog(...args) }));
-vi.mock('../../coordinators/groupCoordinator', () => ({ showGroupDialog: (...args) => showGroupDialog(...args) }));
+vi.mock('../../coordinators/userCoordinator', () => ({
+    showUserDialog: (...args) => showUserDialog(...args)
+}));
+vi.mock('../../coordinators/avatarCoordinator', () => ({
+    showAvatarDialog: (...args) => showAvatarDialog(...args)
+}));
+vi.mock('../../coordinators/worldCoordinator', () => ({
+    showWorldDialog: (...args) => showWorldDialog(...args)
+}));
+vi.mock('../../coordinators/groupCoordinator', () => ({
+    showGroupDialog: (...args) => showGroupDialog(...args)
+}));
 
-import { useGlobalSearchStore } from '../globalSearch';
+import { useQuickSearchStore } from '../quickSearch';
 
 function setupStores() {
     mocks.friendStore = reactive({ friends: new Map() });
-    mocks.favoriteStore = reactive({ favoriteAvatars: [], favoriteWorlds: [] });
-    mocks.avatarStore = reactive({ cachedAvatars: new Map() });
-    mocks.worldStore = reactive({ cachedWorlds: new Map() });
-    mocks.groupStore = reactive({ currentUserGroups: new Map() });
+    mocks.searchIndexStore = reactive({
+        version: 0,
+        getSnapshot() {
+            const friendsList = [];
+            for (const ctx of (mocks.friendStore?.friends || new Map()).values()) {
+                if (typeof ctx.ref === 'undefined') continue;
+                friendsList.push({
+                    id: ctx.id,
+                    name: ctx.name,
+                    memo: ctx.memo || '',
+                    note: ctx.ref?.note || '',
+                    imageUrl: ctx.ref?.currentAvatarThumbnailImageUrl || ''
+                });
+            }
+            return {
+                friends: friendsList,
+                avatars: [],
+                worlds: [],
+                groups: [],
+                favAvatars: [],
+                favWorlds: []
+            };
+        }
+    });
     mocks.userStore = reactive({ currentUser: { id: 'usr_me' } });
 }
 
-describe('useGlobalSearchStore', () => {
+describe('useQuickSearchStore', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mocks.workerInstances.length = 0;
@@ -75,7 +91,7 @@ describe('useGlobalSearchStore', () => {
     });
 
     test('discards stale worker results and applies the latest seq only', async () => {
-        const store = useGlobalSearchStore();
+        const store = useQuickSearchStore();
         store.setQuery('ab');
         await nextTick();
 
@@ -104,7 +120,10 @@ describe('useGlobalSearchStore', () => {
         });
         expect(store.friendResults).toEqual([]);
 
-        mocks.friendStore.friends.set('usr_new', { id: 'usr_new', ref: { id: 'usr_new' } });
+        mocks.friendStore.friends.set('usr_new', {
+            id: 'usr_new',
+            ref: { id: 'usr_new' }
+        });
         worker.emit({
             type: 'searchResult',
             payload: {
@@ -124,7 +143,7 @@ describe('useGlobalSearchStore', () => {
     });
 
     test('short query clears results and blocks stale refill', async () => {
-        const store = useGlobalSearchStore();
+        const store = useQuickSearchStore();
         store.setQuery('ab');
         await nextTick();
 
@@ -153,7 +172,7 @@ describe('useGlobalSearchStore', () => {
     });
 
     test('re-dispatches search when currentUserId changes and query is active', async () => {
-        const store = useGlobalSearchStore();
+        const store = useQuickSearchStore();
         store.setQuery('ab');
         await nextTick();
 
@@ -169,5 +188,38 @@ describe('useGlobalSearchStore', () => {
         const lastMessage = worker.postMessage.mock.calls.at(-1)[0];
         expect(lastMessage.type).toBe('search');
         expect(lastMessage.payload.currentUserId).toBe('usr_other');
+    });
+
+    test('re-dispatches search after index update when query is active', async () => {
+        vi.useFakeTimers();
+        const store = useQuickSearchStore();
+        store.isOpen = true;
+        await nextTick();
+
+        store.setQuery('ab');
+        await nextTick();
+
+        const worker = mocks.workerInstances[0];
+        const callsBefore = worker.postMessage.mock.calls.length;
+
+        // Simulate searchIndex version bump (as if data arrived)
+        mocks.searchIndexStore.version++;
+        await nextTick();
+
+        // Fast-forward the 200ms debounce
+        vi.advanceTimersByTime(200);
+        await nextTick();
+
+        const newCalls = worker.postMessage.mock.calls.slice(callsBefore);
+        const types = newCalls.map((c) => c[0].type);
+        expect(types).toContain('updateIndex');
+        expect(types).toContain('search');
+
+        // updateIndex should come before search
+        const updateIdx = types.indexOf('updateIndex');
+        const searchIdx = types.lastIndexOf('search');
+        expect(updateIdx).toBeLessThan(searchIdx);
+
+        vi.useRealTimers();
     });
 });

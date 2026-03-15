@@ -5,6 +5,7 @@ import {
     avatarRequest,
     favoriteRequest
 } from '../../../api';
+import { removeAvatarFromCache } from '../../../coordinators/avatarCoordinator';
 import {
     copyToClipboard,
     openExternalLink,
@@ -287,7 +288,8 @@ export function useAvatarDialogCommands(
                     title: t('confirm.title'),
                     description: t('confirm.command_question', {
                         command: t('dialog.avatar.actions.block')
-                    })
+                    }),
+                    destructive: true
                 }),
                 handler: (id) => {
                     avatarModerationRequest
@@ -369,14 +371,15 @@ export function useAvatarDialogCommands(
                     title: t('confirm.title'),
                     description: t('confirm.command_question', {
                         command: t('dialog.avatar.actions.delete')
-                    })
+                    }),
+                    destructive: true
                 }),
                 handler: (id) => {
                     avatarRequest
                         .deleteAvatar({ avatarId: id })
                         .then((args) => {
                             const { json } = args;
-                            cachedAvatars.delete(json._id);
+                            removeAvatarFromCache(json._id);
                             if (userDialog.value.id === json.authorId) {
                                 const map = new Map();
                                 for (const ref of cachedAvatars.values()) {
@@ -399,7 +402,8 @@ export function useAvatarDialogCommands(
                     title: t('confirm.title'),
                     description: t('confirm.command_question', {
                         command: t('dialog.avatar.actions.delete_impostor')
-                    })
+                    }),
+                    destructive: true
                 }),
                 handler: (id) => {
                     avatarRequest
@@ -432,7 +436,8 @@ export function useAvatarDialogCommands(
                     title: t('confirm.title'),
                     description: t('confirm.command_question', {
                         command: t('dialog.avatar.actions.regenerate_impostor')
-                    })
+                    }),
+                    destructive: true
                 }),
                 handler: (id) => {
                     avatarRequest

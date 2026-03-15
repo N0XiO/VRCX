@@ -50,11 +50,11 @@
                                             </ContextMenuTrigger>
                                             <ContextMenuContent>
                                                 <ContextMenuItem
-                                                    :disabled="!hasNotifications"
+                                                    v-if="hasNotifications"
                                                     @click="clearAllNotifications">
                                                     {{ t('nav_menu.mark_all_read') }}
                                                 </ContextMenuItem>
-                                                <ContextMenuSeparator />
+                                                <ContextMenuSeparator v-if="hasNotifications" />
                                                 <template v-if="isDashboardItem(item)">
                                                     <ContextMenuItem @click="handleEditDashboard(item)">
                                                         {{ t('nav_menu.edit_dashboard') }}
@@ -101,10 +101,10 @@
                 </SidebarContent>
             </ContextMenuTrigger>
             <ContextMenuContent>
-                <ContextMenuItem :disabled="!hasNotifications" @click="clearAllNotifications">
+                <ContextMenuItem v-if="hasNotifications" @click="clearAllNotifications">
                     {{ t('nav_menu.mark_all_read') }}
                 </ContextMenuItem>
-                <ContextMenuSeparator />
+                <ContextMenuSeparator v-if="hasNotifications" />
                 <ContextMenuItem @click="handleQuickCreateDashboard">
                     {{ t('dashboard.new_dashboard') }}
                 </ContextMenuItem>
@@ -326,9 +326,7 @@
         const dashboard = await dashboardStore.createDashboard(t('dashboard.default_name'));
         const dashboardKey = `${DASHBOARD_NAV_KEY_PREFIX}${dashboard.id}`;
         const currentLayout = [...navLayout.value];
-        const directAccessIdx = currentLayout.findIndex(
-            (entry) => entry.type === 'item' && entry.key === 'direct-access'
-        );
+        const directAccessIdx = currentLayout.findIndex((entry) => entry.type === 'item' && entry.key === 'direct-access');
         const newEntry = { type: 'item', key: dashboardKey };
         if (directAccessIdx !== -1) {
             currentLayout.splice(directAccessIdx, 0, newEntry);
@@ -363,7 +361,8 @@
         }
         const { ok } = await modalStore.confirm({
             title: t('dashboard.confirmations.delete_title'),
-            description: t('dashboard.confirmations.delete_description')
+            description: t('dashboard.confirmations.delete_description'),
+            destructive: true
         });
         if (!ok) {
             return;
