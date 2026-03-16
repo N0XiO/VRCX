@@ -116,7 +116,9 @@
                                     v-else
                                     class="flex items-center gap-1 px-2 h-[22px] whitespace-nowrap border-r border-border cursor-pointer hover:bg-accent"
                                     @click="vrcStatusStore.openStatusPage()">
-                                    <span class="inline-block size-2 rounded-full shrink-0 bg-[#e6a23c]" />
+                                    <span
+                                        class="inline-block size-2 rounded-full shrink-0"
+                                        :class="vrcStatusStore.isMajor ? 'bg-destructive' : 'bg-status-askme'" />
                                     <span class="text-foreground text-[11px]">{{ t('status_bar.servers') }}</span>
                                 </div>
                             </HoverCardTrigger>
@@ -127,7 +129,9 @@
                                 align="start"
                                 :side-offset="4">
                                 <div class="flex items-center gap-1.5 mb-1.5">
-                                    <span class="inline-block size-2 rounded-full shrink-0 bg-[#e6a23c]" />
+                                    <span
+                                        class="inline-block size-2 rounded-full shrink-0"
+                                        :class="vrcStatusStore.isMajor ? 'bg-destructive' : 'bg-status-askme'" />
                                     <span class="font-semibold text-xs text-foreground">{{
                                         t('status_bar.servers_issue')
                                     }}</span>
@@ -207,6 +211,7 @@
                                         :step="1"
                                         :format-options="{ maximumFractionDigits: 0 }"
                                         class="w-20"
+                                        @click.stop
                                         @update:modelValue="setZoomLevel">
                                         <NumberFieldContent>
                                             <NumberFieldDecrement />
@@ -278,18 +283,26 @@
                 <ContextMenuSub>
                     <ContextMenuSubTrigger>{{ t('status_bar.clocks') }}</ContextMenuSubTrigger>
                     <ContextMenuSubContent>
-                        <ContextMenuRadioGroup :model-value="String(clockCount)" @update:modelValue="setClockCount">
-                            <ContextMenuRadioItem value="0">
-                                {{ t('status_bar.clocks_none') }}
-                            </ContextMenuRadioItem>
-                            <ContextMenuRadioItem value="1"> 1 {{ t('status_bar.clock') }} </ContextMenuRadioItem>
-                            <ContextMenuRadioItem value="2">
-                                2 {{ t('status_bar.clocks_label') }}
-                            </ContextMenuRadioItem>
-                            <ContextMenuRadioItem value="3">
-                                3 {{ t('status_bar.clocks_label') }}
-                            </ContextMenuRadioItem>
-                        </ContextMenuRadioGroup>
+                        <ContextMenuCheckboxItem
+                            :model-value="clockCount === 0"
+                            @update:model-value="setClockCount('0')">
+                            {{ t('status_bar.clocks_none') }}
+                        </ContextMenuCheckboxItem>
+                        <ContextMenuCheckboxItem
+                            :model-value="clockCount === 1"
+                            @update:model-value="setClockCount('1')">
+                            1 {{ t('status_bar.clock') }}
+                        </ContextMenuCheckboxItem>
+                        <ContextMenuCheckboxItem
+                            :model-value="clockCount === 2"
+                            @update:model-value="setClockCount('2')">
+                            2 {{ t('status_bar.clocks_label') }}
+                        </ContextMenuCheckboxItem>
+                        <ContextMenuCheckboxItem
+                            :model-value="clockCount === 3"
+                            @update:model-value="setClockCount('3')">
+                            3 {{ t('status_bar.clocks_label') }}
+                        </ContextMenuCheckboxItem>
                     </ContextMenuSubContent>
                 </ContextMenuSub>
             </ContextMenuContent>
@@ -302,8 +315,6 @@
         ContextMenu,
         ContextMenuCheckboxItem,
         ContextMenuContent,
-        ContextMenuRadioGroup,
-        ContextMenuRadioItem,
         ContextMenuSeparator,
         ContextMenuSub,
         ContextMenuSubContent,

@@ -12,6 +12,8 @@
             "open": "Open",
             "confirm": "Confirm",
             "clear": "Clear",
+            "delete": "Delete",
+            "remove": "Remove",
             "reset": "Reset",
             "view_details": "View Details"
         },
@@ -75,6 +77,10 @@
             "hide": "Hide",
             "show": "Show",
             "hidden_items": "Hidden",
+            "pin_to_nav": "Pin to Navigation",
+            "unpin_from_nav": "Unpin",
+            "pinned": "Added to navigation",
+            "unpinned": "Removed from navigation",
             "confirm": "Confirm",
             "cancel": "Cancel",
             "restore_default": "Restore Default",
@@ -172,6 +178,7 @@
             "group_by_instance": "Group by Instance",
             "split_favorite_friends": "Show Favorite Groups",
             "hide_friends_in_same_instance": "Hide Grouped Friends",
+            "same_instance_above_favorites": "Prioritize Same Instance",
             "sort_primary": "Sort by",
             "sort_secondary": "Then by",
             "sort_tertiary": "Then by",
@@ -229,6 +236,7 @@
             "same_instance": "Same instance",
             "active": "Active",
             "offline": "Offline",
+            "search_placeholder": "Search friends",
             "spacing": "Spacing",
             "scale": "Scale",
             "separate_same_instance_friends": "Separate Same Instance Friends",
@@ -298,9 +306,7 @@
             },
             "group": {
                 "header": "Group"
-            },
-            "prev_page": "Prev",
-            "next_page": "Next"
+            }
         },
         "favorite": {
             "worlds": {
@@ -567,10 +573,10 @@
                     "steam_screenshots_description": "Opens your Steam screenshots folder"
                 },
                 "header": "Pictures",
-                "screenshot": "Screenshot Management",
-                "screenshot_description": "Manage screenshots and view metadata",
-                "inventory": "VRC+ Images & Inventory Management",
-                "inventory_description": "Manage VRC+ Images & Inventory"
+                "screenshot": "Screenshot Manager",
+                "screenshot_description": "View and manage screenshot metadata",
+                "gallery": "Image Manager",
+                "gallery_description": "Manage images and inventory"
             },
             "shortcuts": {
                 "header": "Shortcuts",
@@ -705,13 +711,12 @@
                     "theme_mode": "Theme",
                     "font_family": "Font",
                     "cjk_font_pack": "CJK Font",
-                    "font_family_inter": "Inter",
+                    "font_family_inter": "Inter (Default)",
                     "font_family_noto_sans": "Noto Sans",
-                    "font_family_source_sans_3": "Source Sans 3",
+                    "font_family_geist": "Geist",
+                    "font_family_nunito_sans": "Nunito Sans",
                     "font_family_ibm_plex_sans": "IBM Plex Sans",
-                    "font_family_harmonyos_sans": "HarmonyOS Sans",
                     "font_family_jetbrains_mono": "JetBrains Mono",
-                    "font_family_roboto": "Roboto",
                     "font_family_fantasque_sans_mono": "Fantasque Sans Mono",
                     "font_family_system_ui": "System Font",
                     "font_family_custom": "Custom",
@@ -740,6 +745,7 @@
                     "sort_favorite_by": "Sort Favorites by",
                     "sort_favorite_by_name": "Name",
                     "sort_favorite_by_date": "Date",
+                    "sort_favorite_by_players": "Players",
                     "sort_instance_users_by": "Sort Instance Users by",
                     "sort_instance_users_by_time": "Time",
                     "sort_instance_users_by_alphabet": "Alphabetical",
@@ -794,7 +800,10 @@
                 "user_dialog": {
                     "header": "User Dialog",
                     "vrchat_notes": "VRChat Notes",
-                    "vrcx_memos": "VRCX Memos"
+                    "vrcx_memos": "VRCX Memos",
+                    "recent_action_cooldown": "Recent Action Indicator",
+                    "recent_action_cooldown_description": "Show a clock icon on invite/request actions that were recently performed",
+                    "recent_action_cooldown_minutes": "Cooldown (minutes)"
                 },
                 "user_colors": {
                     "header": "User Colors",
@@ -1271,6 +1280,23 @@
                     "friend_order": "Friend Order"
                 }
             },
+            "activity": {
+                "header": "Activity",
+                "total_events": "{count} online events",
+                "times_online": "times online",
+                "most_active_day": "Most active day:",
+                "most_active_time": "Peak hours:",
+                "days": {
+                    "mon": "Mon",
+                    "tue": "Tue",
+                    "wed": "Wed",
+                    "thu": "Thu",
+                    "fri": "Fri",
+                    "sat": "Sat",
+                    "sun": "Sun"
+                },
+                "easter_egg": "Did you farm your green squares today?"
+            },
             "note_memo": {
                 "header": "Edit Note And Memo",
                 "cancel": "Cancel",
@@ -1540,7 +1566,12 @@
             "header": "Social Status",
             "history": "History",
             "status_placeholder": "Status",
-            "update": "Update"
+            "update": "Update",
+            "presets": "Presets",
+            "save_preset": "Save as Preset",
+            "preset_saved": "Preset saved",
+            "preset_exists": "Preset already exists",
+            "preset_limit": "Maximum {max} presets"
         },
         "language": {
             "header": "Language",
@@ -1852,7 +1883,20 @@
                 "world_id": "World ID"
             },
             "no_results": "No results found",
-            "invalid_file": "Invalid file selected. Please select a valid VRChat screenshot."
+            "invalid_file": "Invalid file selected. Please select a valid VRChat screenshot.",
+            "section_location": "Location",
+            "section_players": "Players",
+            "section_file_info": "File Info",
+            "section_note": "Note",
+            "section_actions": "Actions",
+            "col_date": "Date",
+            "col_world": "World",
+            "col_players": "Players",
+            "col_resolution": "Resolution",
+            "col_match": "Match",
+            "col_author": "Author",
+            "back_to_results": "Back to {count} results",
+            "result_count": "{count} results"
         },
         "set_world_tags": {
             "header": "Set World Tags",
@@ -2417,6 +2461,7 @@
         "file": {
             "not_image": "File isn't an image",
             "too_large": "File size too large",
+            "folder_opened": "Folder opened",
             "folder_missing": "Folder doesn't exist"
         },
         "group": {

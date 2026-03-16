@@ -2,7 +2,7 @@
     <div class="x-container">
         <div class="flex flex-col h-full min-h-0 pb-0">
             <FavoritesToolbar
-                :sort-favorites="sortFavorites"
+                :sort-value="sortFavorites ? 'date' : 'name'"
                 v-model:search-query="friendFavoriteSearch"
                 :search-placeholder="t('view.favorite.worlds.search')"
                 v-model:toolbar-menu-open="friendToolbarMenuOpen"
@@ -12,7 +12,7 @@
                 v-model:card-spacing-value="friendCardSpacingValue"
                 :card-spacing-percent="friendCardSpacingPercent"
                 :card-spacing-slider="friendCardSpacingSlider"
-                @update:sort-favorites="handleSortFavoritesChange"
+                @update:sort-value="handleSortFavoritesChange"
                 @search="searchFriendFavorites"
                 @import="handleFriendImportClick"
                 @export="handleFriendExportClick" />
@@ -291,7 +291,12 @@
                                             @click="showUserDialog(favorite.id)">
                                             <div class="favorites-search-card__content">
                                                 <div class="favorites-search-card__avatar">
-                                                    <img :src="userImage(favorite, true)" loading="lazy" />
+                                                    <Avatar class="size-full">
+                                                        <AvatarImage :src="userImage(favorite, true)" class="object-cover" loading="lazy" />
+                                                        <AvatarFallback>
+                                                            <User class="size-5 text-muted-foreground" />
+                                                        </AvatarFallback>
+                                                    </Avatar>
                                                 </div>
                                                 <div class="favorites-search-card__detail">
                                                     <div class="flex items-center gap-2">
@@ -325,8 +330,9 @@
 </template>
 
 <script setup>
-    import { Ellipsis, MoreHorizontal, Plus, RefreshCcw, RefreshCw } from 'lucide-vue-next';
+    import { Ellipsis, MoreHorizontal, Plus, RefreshCcw, RefreshCw, User } from 'lucide-vue-next';
     import { computed, ref, watch } from 'vue';
+    import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
     import { Button } from '@/components/ui/button';
     import { DataTableEmpty } from '@/components/ui/data-table';
     import { InputGroupField } from '@/components/ui/input-group';
@@ -484,7 +490,7 @@
      * @param value
      */
     function handleSortFavoritesChange(value) {
-        const next = Boolean(value);
+        const next = value === 'date';
         if (next !== sortFavorites.value) {
             setSortFavorites();
         }

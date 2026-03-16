@@ -10,12 +10,19 @@
             <div style="display: flex">
                 <div style="flex: none; width: 160px; height: 120px">
                     <img
-                        v-if="!worldDialog.loading"
+                        v-if="!worldDialog.loading && !imageError"
                         :src="worldDialog.ref.thumbnailImageUrl"
                         class="cursor-pointer"
                         style="width: 160px; height: 120px; border-radius: var(--radius-xl)"
                         @click="showFullscreenImageDialog(worldDialog.ref.imageUrl)"
+                        @error="imageError = true"
                         loading="lazy" />
+                    <div
+                        v-else-if="!worldDialog.loading"
+                        class="flex items-center justify-center bg-muted"
+                        style="width: 160px; height: 120px; border-radius: var(--radius-xl)">
+                        <Image class="size-8 text-muted-foreground" />
+                    </div>
                 </div>
                 <div class="ml-4" style="flex: 1; display: flex; align-items: flex-start">
                     <div style="flex: 1">
@@ -374,7 +381,7 @@
         Upload,
         Wand2
     } from 'lucide-vue-next';
-    import { computed, defineAsyncComponent, ref, watch } from 'vue';
+    import { computed, ref, watch } from 'vue';
     import { DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
     import { Button } from '@/components/ui/button';
     import { Spinner } from '@/components/ui/spinner';
@@ -415,9 +422,9 @@
     import WorldDialogInstancesTab from './WorldDialogInstancesTab.vue';
     import { showUserDialog } from '../../../coordinators/userCoordinator';
 
-    const SetWorldTagsDialog = defineAsyncComponent(() => import('./SetWorldTagsDialog.vue'));
-    const WorldAllowedDomainsDialog = defineAsyncComponent(() => import('./WorldAllowedDomainsDialog.vue'));
-    const NewInstanceDialog = defineAsyncComponent(() => import('../NewInstanceDialog/NewInstanceDialog.vue'));
+    import NewInstanceDialog from '../NewInstanceDialog/NewInstanceDialog.vue';
+    import SetWorldTagsDialog from './SetWorldTagsDialog.vue';
+    import WorldAllowedDomainsDialog from './WorldAllowedDomainsDialog.vue';
 
     const { currentUser, userDialog } = storeToRefs(useUserStore());
     const { worldDialog } = storeToRefs(useWorldStore());
@@ -480,6 +487,14 @@
     const treeData = ref({});
     const translatedDescription = ref('');
     const isTranslating = ref(false);
+    const imageError = ref(false);
+
+    watch(
+        () => worldDialog.value.id,
+        () => {
+            imageError.value = false;
+        }
+    );
 
     const isDialogVisible = computed({
         get() {

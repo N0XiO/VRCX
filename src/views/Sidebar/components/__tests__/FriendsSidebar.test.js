@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     appearanceStore: {
         isSidebarGroupByInstance: { value: false },
         isHideFriendsInSameInstance: { value: false },
+        isSameInstanceAboveFavorites: { value: false },
         isSidebarDivideByFriendGroup: { value: false },
         sidebarFavoriteGroups: { value: [] },
         sidebarFavoriteGroupOrder: { value: [] },
@@ -60,7 +61,9 @@ const mocks = vi.hoisted(() => ({
     },
     configRepository: {
         getBool: vi.fn(),
-        setBool: vi.fn()
+        setBool: vi.fn(),
+        getArray: vi.fn(),
+        setArray: vi.fn()
     },
     notificationRequest: {
         sendRequestInvite: vi.fn().mockResolvedValue({}),
@@ -206,7 +209,8 @@ vi.mock('../FriendItem.vue', () => ({
 }));
 
 vi.mock('lucide-vue-next', () => ({
-    ChevronDown: { template: '<span data-testid="chevron" />' }
+    ChevronDown: { template: '<span data-testid="chevron" />' },
+    User: { template: '<i />' }
 }));
 
 import FriendsSidebar from '../FriendsSidebar.vue';
@@ -250,6 +254,8 @@ describe('FriendsSidebar.vue', () => {
             (_key, defaultValue) => Promise.resolve(defaultValue ?? false)
         );
         mocks.configRepository.setBool.mockResolvedValue(undefined);
+        mocks.configRepository.getArray.mockResolvedValue([]);
+        mocks.configRepository.setArray.mockResolvedValue(undefined);
         vi.clearAllMocks();
     });
 

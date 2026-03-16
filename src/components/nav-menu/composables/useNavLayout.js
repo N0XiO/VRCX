@@ -1,15 +1,34 @@
+import { useEventListener } from '@vueuse/core';
 import { computed, ref, watch } from 'vue';
-
-import dayjs from 'dayjs';
 
 import configRepository from '../../../services/config';
 import {
     DASHBOARD_NAV_KEY_PREFIX,
+    isToolNavKey,
     navDefinitions
 } from '../../../shared/constants';
+import { triggerNavEntryAction } from '../navActionUtils';
+import {
+    buildMenuItems,
+    findFirstNavEntry,
+    findFirstNavKey
+} from '../navLayoutHelpers';
+import {
+    createBaseDefaultNavLayout,
+    insertDashboardEntries
+} from '../navLayoutDefaults';
+import {
+    dispatchNavLayoutUpdated,
+    NAV_LAYOUT_UPDATED_EVENT
+} from '../navLayoutEvents';
+import {
+    buildNavDefinitionsForLayout,
+    createNavDefinitionMap,
+    generateNavFolderId,
+    loadStoredNavConfig,
+    NAV_CONFIG_KEY
+} from '../navConfigUtils';
 import { normalizeHiddenKeys, sanitizeLayout } from '../navMenuUtils';
-
-const DEFAULT_FOLDER_ICON = 'ri-folder-line';
 
 export function useNavLayout({
     t,
@@ -17,7 +36,8 @@ export function useNavLayout({
     router,
     dashboardStore,
     dashboards,
-    directAccessPaste
+    directAccessPaste,
+    triggerTool
 }) {
     const navLayout = ref([]);
     const navLayoutReady = ref(false);
@@ -28,126 +48,28 @@ export function useNavLayout({
         ...dashboardStore.getDashboardNavDefinitions()
     ]);
 
-    const navDefinitionMap = computed(() => {
-        const map = new Map();
-        allNavDefinitions.value.forEach((item) => {
-            map.set(item.key, item);
-        });
-        return map;
-    });
+    const navDefinitionMap = computed(() =>
+        createNavDefinitionMap(allNavDefinitions.value)
+    );
 
-    const createDefaultNavLayout = () => [
-        { type: 'item', key: 'feed' },
-        { type: 'item', key: 'friends-locations' },
-        { type: 'item', key: 'game-log' },
-        { type: 'item', key: 'player-list' },
-        { type: 'item', key: 'search' },
-        {
-            type: 'folder',
-            id: 'default-folder-favorites',
-            nameKey: 'nav_tooltip.favorites',
-            name: t('nav_tooltip.favorites'),
-            icon: 'ri-star-line',
-            items: ['favorite-friends', 'favorite-worlds', 'favorite-avatars']
-        },
-        {
-            type: 'folder',
-            id: 'default-folder-social',
-            nameKey: 'nav_tooltip.social',
-            name: t('nav_tooltip.social'),
-            icon: 'ri-group-line',
-            items: ['friend-log', 'friend-list', 'moderation']
-        },
-        { type: 'item', key: 'notification' },
-        { type: 'item', key: 'my-avatars' },
-        {
-            type: 'folder',
-            id: 'default-folder-charts',
-            nameKey: 'nav_tooltip.charts',
-            name: t('nav_tooltip.charts'),
-            icon: 'ri-pie-chart-line',
-            items: ['charts-instance', 'charts-mutual']
-        },
-        { type: 'item', key: 'tools' },
-        { type: 'item', key: 'direct-access' }
-    ];
+    // Tool nav items are add/remove only; they no longer participate in hidden state.
+    const getDefaultHiddenKeys = (layout = []) => {
+        void layout;
+        return [];
+    };
 
-    const menuItems = computed(() => {
-        const items = [];
-        navLayout.value.forEach((entry) => {
-            if (entry.type === 'item') {
-                const definition = navDefinitionMap.value.get(entry.key);
-                if (!definition) {
-                    return;
-                }
-                items.push({
-                    ...definition,
-                    index: definition.key,
-                    title: definition.tooltip || definition.labelKey,
-                    titleIsCustom: Boolean(definition.isDashboard)
-                });
-                return;
-            }
+    const createDefaultNavLayout = () => createBaseDefaultNavLayout(t);
 
-            if (entry.type === 'folder') {
-                const folderDefinitions = (entry.items || [])
-                    .map((key) => navDefinitionMap.value.get(key))
-                    .filter(Boolean);
-                if (folderDefinitions.length === 0) {
-                    return;
-                }
-
-                const folderEntries = folderDefinitions.map((definition) => ({
-                    label: definition.labelKey,
-                    routeName: definition.routeName,
-                    routeParams: definition.routeParams,
-                    index: definition.key,
-                    icon: definition.icon,
-                    action: definition.action,
-                    titleIsCustom: Boolean(definition.isDashboard)
-                }));
-
-                items.push({
-                    index: entry.id,
-                    icon: entry.icon || DEFAULT_FOLDER_ICON,
-                    title:
-                        entry.name?.trim() ||
-                        t('nav_menu.custom_nav.folder_name_placeholder'),
-                    titleIsCustom: true,
-                    children: folderEntries
-                });
-            }
-        });
-        return items;
-    });
+    const menuItems = computed(() =>
+        buildMenuItems(navLayout.value, navDefinitionMap.value, t)
+    );
 
     const getFirstNavEntryLocal = (layout) => {
-        for (const entry of layout) {
-            if (entry.type === 'item') {
-                const definition = navDefinitionMap.value.get(entry.key);
-                if (
-                    definition?.routeName ||
-                    definition?.action ||
-                    definition?.path
-                ) {
-                    return definition;
-                }
-            }
-            if (entry.type === 'folder' && entry.items?.length) {
-                const definition = entry.items
-                    .map((key) => navDefinitionMap.value.get(key))
-                    .find((def) => def?.routeName || def?.action || def?.path);
-                if (definition) {
-                    return definition;
-                }
-            }
-        }
-        return null;
+        return findFirstNavEntry(layout, navDefinitionMap.value);
     };
 
     const getFirstNavKeyLocal = (layout) => {
-        const entry = getFirstNavEntryLocal(layout);
-        return entry?.key || null;
+        return findFirstNavKey(layout, navDefinitionMap.value);
     };
 
     const activeMenuIndex = computed(() => {
@@ -156,64 +78,36 @@ export function useNavLayout({
             return `${DASHBOARD_NAV_KEY_PREFIX}${currentRoute.params.id}`;
         }
         const currentRouteName = currentRoute?.name;
-        const navKey = currentRoute?.meta?.navKey || currentRouteName;
-        if (!navKey) {
+        const navKeys = Array.isArray(currentRoute?.meta?.navKeys)
+            ? currentRoute.meta.navKeys
+            : [currentRoute?.meta?.navKey || currentRouteName].filter(Boolean);
+        if (!navKeys.length) {
             return getFirstNavKeyLocal(navLayout.value) || 'feed';
         }
 
         for (const entry of navLayout.value) {
-            if (entry.type === 'item' && entry.key === navKey) {
+            if (entry.type === 'item' && navKeys.includes(entry.key)) {
                 return entry.key;
             }
-            if (entry.type === 'folder' && entry.items?.includes(navKey)) {
-                return navKey;
+            if (entry.type === 'folder') {
+                const matchedKey = navKeys.find((key) =>
+                    entry.items?.includes(key)
+                );
+                if (matchedKey) {
+                    return matchedKey;
+                }
             }
         }
         return getFirstNavKeyLocal(navLayout.value) || 'feed';
     });
 
-    const generateFolderId = () => {
-        if (
-            typeof crypto !== 'undefined' &&
-            typeof crypto.randomUUID === 'function'
-        ) {
-            return `nav-folder-${crypto.randomUUID()}`;
-        }
-        return `nav-folder-${dayjs().toISOString()}-${Math.random().toString().slice(2, 4)}`;
-    };
-
-    const collectLayoutKeys = (layout) => {
-        const keys = new Set();
-        if (!Array.isArray(layout)) {
-            return keys;
-        }
-        layout.forEach((entry) => {
-            if (entry?.type === 'item' && entry.key) {
-                keys.add(entry.key);
-                return;
-            }
-            if (entry?.type === 'folder' && Array.isArray(entry.items)) {
-                entry.items.forEach((key) => {
-                    if (key) {
-                        keys.add(key);
-                    }
-                });
-            }
-        });
-        return keys;
-    };
-
     const getAppendDefinitions = (layout, hiddenKeys = []) => {
-        const keysInLayout = collectLayoutKeys(layout);
-        const hiddenSet = new Set(Array.isArray(hiddenKeys) ? hiddenKeys : []);
-        const dashboardDefinitions = dashboardStore
-            .getDashboardNavDefinitions()
-            .filter(
-                (definition) =>
-                    keysInLayout.has(definition.key) ||
-                    hiddenSet.has(definition.key)
-            );
-        return [...navDefinitions, ...dashboardDefinitions];
+        return buildNavDefinitionsForLayout(
+            navDefinitions,
+            dashboardStore.getDashboardNavDefinitions(),
+            layout,
+            hiddenKeys
+        );
     };
 
     const sanitizeLayoutLocal = (layout, hiddenKeys = []) => {
@@ -223,68 +117,36 @@ export function useNavLayout({
             navDefinitionMap.value,
             getAppendDefinitions(layout, hiddenKeys),
             t,
-            generateFolderId
+            generateNavFolderId
         );
     };
 
     const defaultNavLayout = computed(() => {
-        const base = createDefaultNavLayout();
-        const dashboardEntries = dashboardStore
-            .getDashboardNavDefinitions()
-            .map((def) => ({ type: 'item', key: def.key }));
-        if (dashboardEntries.length) {
-            const directAccessIdx = base.findIndex(
-                (entry) =>
-                    entry.type === 'item' && entry.key === 'direct-access'
-            );
-            if (directAccessIdx !== -1) {
-                base.splice(directAccessIdx, 0, ...dashboardEntries);
-            } else {
-                base.push(...dashboardEntries);
-            }
-        }
-        return sanitizeLayoutLocal(base, []);
+        const base = insertDashboardEntries(
+            createDefaultNavLayout(),
+            dashboardStore.getDashboardNavDefinitions()
+        );
+        return sanitizeLayoutLocal(base, getDefaultHiddenKeys(base));
     });
 
-    const handleRouteChange = (routeName, routeParams = undefined) => {
-        if (!routeName) {
-            return;
-        }
-        if (routeParams) {
-            router.push({ name: routeName, params: routeParams });
-            return;
-        }
-        router.push({ name: routeName });
-    };
-
     const triggerNavAction = (entry) => {
-        if (!entry) {
-            return;
-        }
-
-        if (entry.action === 'direct-access') {
-            directAccessPaste();
-            return;
-        }
-
-        if (entry.routeName) {
-            handleRouteChange(entry.routeName, entry.routeParams);
-            return;
-        }
-
-        if (entry.path) {
-            router.push(entry.path);
+        const action = triggerNavEntryAction(entry, {
+            router,
+            directAccessPaste
+        });
+        if (action?.type === 'tool' && action.toolKey) {
+            triggerTool?.(action.toolKey);
         }
     };
 
     const saveNavLayout = async (layout, hiddenKeys = []) => {
         const normalizedHiddenKeys = normalizeHiddenKeys(
-            hiddenKeys,
+            [...hiddenKeys, ...getDefaultHiddenKeys(layout)],
             navDefinitionMap.value
         );
         try {
             await configRepository.setString(
-                'VRCX_customNavMenuLayoutList',
+                NAV_CONFIG_KEY,
                 JSON.stringify({
                     layout,
                     hiddenKeys: normalizedHiddenKeys
@@ -292,12 +154,15 @@ export function useNavLayout({
             );
         } catch (error) {
             console.error('Failed to save custom nav', error);
+            return;
         }
+
+        dispatchNavLayoutUpdated();
     };
 
     const applyCustomNavLayout = async (layout, hiddenKeys = []) => {
         const normalizedHiddenKeys = normalizeHiddenKeys(
-            hiddenKeys,
+            [...hiddenKeys, ...getDefaultHiddenKeys(layout)],
             navDefinitionMap.value
         );
         const sanitized = sanitizeLayoutLocal(layout, normalizedHiddenKeys);
@@ -330,30 +195,26 @@ export function useNavLayout({
         let layoutData = null;
         let hiddenKeysData = [];
         try {
-            const storedValue = await configRepository.getString(
-                'VRCX_customNavMenuLayoutList'
-            );
-            if (storedValue) {
-                const parsed = JSON.parse(storedValue);
-                if (Array.isArray(parsed)) {
-                    layoutData = parsed;
-                } else if (Array.isArray(parsed?.layout)) {
-                    layoutData = parsed.layout;
-                    hiddenKeysData = Array.isArray(parsed.hiddenKeys)
-                        ? parsed.hiddenKeys
-                        : [];
+            const loaded = await loadStoredNavConfig(
+                configRepository,
+                createDefaultNavLayout(),
+                {
+                    configKey: NAV_CONFIG_KEY,
+                    filterHiddenKey: (key) => !isToolNavKey(key)
                 }
-            }
+            );
+            layoutData = loaded.layout;
+            hiddenKeysData = loaded.hiddenKeys;
         } catch (error) {
             console.error('Failed to load custom nav', error);
         } finally {
+            const fallbackLayout = layoutData?.length
+                ? layoutData
+                : createDefaultNavLayout();
             const normalizedHiddenKeys = normalizeHiddenKeys(
                 hiddenKeysData,
                 navDefinitionMap.value
             );
-            const fallbackLayout = layoutData?.length
-                ? layoutData
-                : createDefaultNavLayout();
             const sanitized = sanitizeLayoutLocal(
                 fallbackLayout,
                 normalizedHiddenKeys
@@ -448,10 +309,21 @@ export function useNavLayout({
         { deep: true }
     );
 
+    const handleExternalNavLayoutUpdate = async () => {
+        await loadNavMenuConfig();
+    };
+
+    useEventListener(
+        typeof window !== 'undefined' ? window : undefined,
+        NAV_LAYOUT_UPDATED_EVENT,
+        handleExternalNavLayoutUpdate
+    );
+
     return {
         navLayout,
         navLayoutReady,
         navHiddenKeys,
+        defaultHiddenKeys: computed(() => getDefaultHiddenKeys(defaultNavLayout.value)),
         menuItems,
         activeMenuIndex,
         allNavDefinitions,

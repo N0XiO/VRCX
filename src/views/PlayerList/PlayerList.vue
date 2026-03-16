@@ -7,11 +7,19 @@
                 style="display: flex; min-height: 120px"
                 class="mb-7">
                 <img
+                    v-if="!worldImageError"
                     :src="currentInstanceWorld.ref.thumbnailImageUrl"
                     class="cursor-pointer"
                     style="flex: none; width: 160px; height: 120px; border-radius: var(--radius-md)"
                     @click="showFullscreenImageDialog(currentInstanceWorld.ref.imageUrl)"
+                    @error="worldImageError = true"
                     loading="lazy" />
+                <div
+                    v-else
+                    class="flex items-center justify-center bg-muted"
+                    style="flex: none; width: 160px; height: 120px; border-radius: var(--radius-md)">
+                    <Image class="size-8 text-muted-foreground" />
+                </div>
                 <div class="ml-2" style="display: flex; flex-direction: column; min-width: 320px; width: 100%">
                     <div class="flex items-center">
                         <span
@@ -173,8 +181,8 @@
 </template>
 
 <script setup>
-    import { computed, defineAsyncComponent, onActivated, onMounted, ref, watch } from 'vue';
-    import { Apple, Home, Monitor, Smartphone } from 'lucide-vue-next';
+    import { computed, onActivated, onMounted, ref, watch } from 'vue';
+    import { Apple, Home, Image, Monitor, Smartphone } from 'lucide-vue-next';
     import { storeToRefs } from 'pinia';
     import { useI18n } from 'vue-i18n';
 
@@ -198,7 +206,7 @@
     import { showUserDialog, lookupUser } from '../../coordinators/userCoordinator';
     import { showWorldDialog } from '../../coordinators/worldCoordinator';
 
-    const PhotonEventTable = defineAsyncComponent(() => import('./components/PhotonEventTable.vue'));
+    import PhotonEventTable from './components/PhotonEventTable.vue';
 
     const { randomUserColours } = storeToRefs(useAppearanceSettingsStore());
     const photonStore = usePhotonStore();
@@ -207,6 +215,15 @@
 
     const { lastLocation } = storeToRefs(useLocationStore());
     const { currentInstanceLocation, currentInstanceWorld, currentInstanceUsersData } = storeToRefs(useInstanceStore());
+
+    const worldImageError = ref(false);
+
+    watch(
+        () => currentInstanceWorld.value?.ref?.id,
+        () => {
+            worldImageError.value = false;
+        }
+    );
     const { getCurrentInstanceUserList } = useInstanceStore();
     const { showFullscreenImageDialog } = useGalleryStore();
     const { currentUser } = storeToRefs(useUserStore());
