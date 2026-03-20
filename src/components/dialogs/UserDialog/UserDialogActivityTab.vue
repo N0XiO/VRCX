@@ -2,7 +2,13 @@
     <div class="flex flex-col" style="min-height: 200px">
         <div style="display: flex; align-items: center; justify-content: space-between">
             <div style="display: flex; align-items: center">
-                <Button class="rounded-full" variant="ghost" size="icon-sm" :disabled="isLoading" @click="loadData">
+                <Button
+                    class="rounded-full"
+                    variant="ghost"
+                    size="icon-sm"
+                    :disabled="isLoading"
+                    :title="t('dialog.user.activity.refresh_hint')"
+                    @click="loadData">
                     <Spinner v-if="isLoading" />
                     <RefreshCw v-else />
                 </Button>
@@ -36,7 +42,12 @@
                 <span class="font-medium ml-1">{{ peakTimeText }}</span>
             </div>
         </div>
-        <div v-if="!isLoading && !hasAnyData" class="flex items-center justify-center flex-1 mt-8">
+        <div v-if="isLoading && !hasAnyData" class="flex flex-col items-center justify-center flex-1 mt-8 gap-2">
+            <Spinner class="h-5 w-5" />
+            <span class="text-sm text-muted-foreground">{{ t('dialog.user.activity.preparing_data') }}</span>
+            <span class="text-xs text-muted-foreground">{{ t('dialog.user.activity.preparing_data_hint') }}</span>
+        </div>
+        <div v-else-if="!isLoading && !hasAnyData" class="flex items-center justify-center flex-1 mt-8">
             <DataTableEmpty type="nodata" />
         </div>
         <div
@@ -192,12 +203,12 @@
     import { database } from '../../../services/database';
     import configRepository from '../../../services/config';
     import { worldRequest } from '../../../api';
-    import { useAppearanceSettingsStore, useUserStore } from '../../../stores';
+    import { useActivityStore, useAppearanceSettingsStore, useUserStore } from '../../../stores';
     import { useWorldStore } from '../../../stores/world';
     import { showWorldDialog } from '../../../coordinators/worldCoordinator';
     import { timeToText } from '../../../shared/utils';
+    import { useCurrentUserSessions } from '../../../composables/useCurrentUserSessions';
     import {
-        buildSessionsFromEvents,
         buildSessionsFromGamelog,
         calculateOverlapGrid,
         filterSessionsByPeriod,
@@ -209,10 +220,11 @@
     const { userDialog, currentUser } = storeToRefs(useUserStore());
     const { isDarkMode, weekStartsOn } = storeToRefs(useAppearanceSettingsStore());
     const worldStore = useWorldStore();
+    const sessionCache = useCurrentUserSessions();
+    const activityStore = useActivityStore();
 
     const chartRef = ref(null);
     const isLoading = ref(false);
-    const totalOnlineEvents = ref(0);
     const hasAnyData = ref(false);
     const peakDayText = ref('');
     const peakTimeText = ref('');
@@ -287,6 +299,12 @@
     watch(() => isDarkMode.value, rebuildChart);
     watch(locale, rebuildChart);
     watch(weekStartsOn, rebuildChart);
+    watch(
+        () => userDialog.value.id,
+        () => {
+            resetActivityState();
+        }
+    );
     watch(selectedPeriod, () => {
         if (cachedTargetSessions.length > 0 && echartsInstance) {
             initChart();
@@ -312,7 +330,7 @@
                     }
                 });
                 if (userDialog.value.activeTab === 'Activity') {
-                    loadOnlineFrequency(userDialog.value.id, 'visible-watch');
+                    loadOnlineFrequency(userDialog.value.id);
                 }
             }
         }
@@ -322,7 +340,7 @@
         () => userDialog.value.activeTab,
         (activeTab) => {
             if (activeTab === 'Activity' && userDialog.value.visible) {
-                loadOnlineFrequency(userDialog.value.id, 'active-tab-watch');
+                loadOnlineFrequency(userDialog.value.id);
             }
         }
     );
@@ -335,7 +353,7 @@
 
     onMounted(() => {
         if (userDialog.value.visible && userDialog.value.activeTab === 'Activity') {
-            loadOnlineFrequency(userDialog.value.id, 'mounted');
+            loadOnlineFrequency(userDialog.value.id);
         }
     });
 
@@ -436,9 +454,7 @@
 
         const filteredSessions = getFilteredSessions();
         // Use timestamps for event count display
-        const filteredTs = getFilteredTimestamps();
-        filteredEventCount.value = filteredTs.length;
-        totalOnlineEvents.value = filteredTs.length;
+        filteredEventCount.value = getFilteredEventCount();
 
         if (filteredSessions.length === 0) {
             peakDayText.value = '';
@@ -489,6 +505,7 @@
             yAxis: {
                 type: 'category',
                 data: displayDayLabels.value,
+                inverse: true,
                 splitArea: { show: false },
                 axisLabel: {
                     fontSize: 11
@@ -541,7 +558,6 @@
         echartsInstance.setOption(option, { notMerge: true });
     }
 
-    let cachedTimestamps = [];
     let activeRequestId = 0;
 
     async function loadData() {
@@ -556,58 +572,20 @@
         isLoading.value = true;
         try {
             if (isSelf.value) {
-                // Self: use gamelog_location for heatmap
                 const rows = await database.getCurrentUserOnlineSessions();
                 if (requestId !== activeRequestId) return;
                 if (userDialog.value.id !== userId) return;
 
-                cachedTimestamps = rows.map((r) => r.created_at);
                 cachedTargetSessions = buildSessionsFromGamelog(rows);
-            } else {
-                // Friend: use feed_online_offline
-                const [timestamps, events] = await Promise.all([
-                    database.getOnlineFrequencyData(userId),
-                    database.getOnlineOfflineSessions(userId)
-                ]);
-                if (requestId !== activeRequestId) return;
-                if (userDialog.value.id !== userId) return;
-
-                cachedTimestamps = timestamps;
-                cachedTargetSessions = buildSessionsFromEvents(events);
+                await finishLoadData(userId);
+                return;
             }
 
-            hasAnyData.value = cachedTimestamps.length > 0;
-            totalOnlineEvents.value = cachedTimestamps.length;
-            lastLoadedUserId = userId;
-
-            await nextTick();
-
-            if (cachedTimestamps.length > 0) {
-                const filteredTs = getFilteredTimestamps();
-                filteredEventCount.value = filteredTs.length;
-
-                await nextTick();
-
-                if (!echartsInstance && chartRef.value) {
-                    echartsInstance = echarts.init(chartRef.value, isDarkMode.value ? 'dark' : null, { height: 240 });
-                    resizeObserver = new ResizeObserver((entries) => {
-                        for (const entry of entries) {
-                            if (echartsInstance) {
-                                echartsInstance.resize({
-                                    width: entry.contentRect.width
-                                });
-                            }
-                        }
-                    });
-                    resizeObserver.observe(chartRef.value);
-                }
-                initChart();
-            } else {
-                peakDayText.value = '';
-                peakTimeText.value = '';
-                hasAnyData.value = false;
-                filteredEventCount.value = 0;
-            }
+            const entry = await activityStore.refreshActivityCache(userId);
+            if (requestId !== activeRequestId) return;
+            if (userDialog.value.id !== userId) return;
+            hydrateFromCacheEntry(entry);
+            await finishLoadData(userId);
         } catch (error) {
             console.error('Error loading online frequency data:', error);
         } finally {
@@ -615,6 +593,45 @@
                 isLoading.value = false;
             }
         }
+    }
+
+    /**
+     * Shared finalization after session data is loaded (both sync and async paths).
+     * @param {string} userId
+     */
+    async function finishLoadData(userId) {
+        hasAnyData.value = cachedTargetSessions.length > 0;
+        lastLoadedUserId = userId;
+
+        await nextTick();
+
+        if (cachedTargetSessions.length > 0) {
+            filteredEventCount.value = getFilteredEventCount();
+
+            await nextTick();
+
+            if (!echartsInstance && chartRef.value) {
+                echartsInstance = echarts.init(chartRef.value, isDarkMode.value ? 'dark' : null, { height: 240 });
+                resizeObserver = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        if (echartsInstance) {
+                            echartsInstance.resize({
+                                width: entry.contentRect.width
+                            });
+                        }
+                    }
+                });
+                resizeObserver.observe(chartRef.value);
+            }
+            initChart();
+        } else {
+            peakDayText.value = '';
+            peakTimeText.value = '';
+            hasAnyData.value = false;
+            filteredEventCount.value = 0;
+        }
+
+        isLoading.value = false;
 
         if (hasAnyData.value && !isSelf.value) {
             loadOverlapData(userId);
@@ -624,21 +641,76 @@
         }
     }
 
-    function getFilteredTimestamps() {
-        if (selectedPeriod.value === 'all') return cachedTimestamps;
+    function resetActivityState() {
+        isLoading.value = false;
+        hasAnyData.value = false;
+        peakDayText.value = '';
+        peakTimeText.value = '';
+        selectedPeriod.value = 'all';
+        filteredEventCount.value = 0;
+        hasOverlapData.value = false;
+        overlapPercent.value = 0;
+        bestOverlapTime.value = '';
+        isOverlapLoading.value = false;
+        topWorlds.value = [];
+        cachedTargetSessions = [];
+        cachedCurrentSessions = [];
+        lastLoadedUserId = '';
+        activeRequestId++;
+    }
+
+    function hydrateFromCacheEntry(entry) {
+        cachedTargetSessions = Array.isArray(entry?.sessions) ? entry.sessions : [];
+    }
+
+    async function loadCachedActivity(userId) {
+        const entry = await activityStore.getCache(userId);
+        if (!entry) {
+            return null;
+        }
+
+        if (userDialog.value.id !== userId) {
+            return null;
+        }
+        hydrateFromCacheEntry(entry);
+        await finishLoadData(userId);
+        return entry;
+    }
+
+    function getFilteredEventCount() {
+        if (selectedPeriod.value === 'all') return cachedTargetSessions.length;
         const days = parseInt(selectedPeriod.value, 10);
-        const cutoff = dayjs().subtract(days, 'day');
-        return cachedTimestamps.filter((ts) => dayjs(ts).isAfter(cutoff));
+        const cutoff = dayjs().subtract(days, 'day').valueOf();
+        return cachedTargetSessions.filter((session) => session.start > cutoff).length;
     }
 
     /**
      * @param {string} userId
      */
     function loadOnlineFrequency(userId) {
-        if (lastLoadedUserId === userId && hasAnyData.value) {
+        if (lastLoadedUserId !== userId) {
+            resetActivityState();
+        }
+        if (!userId) {
             return;
         }
-        loadData();
+        if (lastLoadedUserId === userId && (hasAnyData.value || isLoading.value)) {
+            return;
+        }
+        if (isSelf.value) {
+            void loadData();
+            return;
+        }
+        void (async () => {
+            const cacheEntry = await loadCachedActivity(userId);
+            if (cacheEntry || activityStore.isRefreshing(userId)) {
+                if (!cacheEntry && !isLoading.value) {
+                    void loadData();
+                }
+                return;
+            }
+            void loadData();
+        })();
     }
 
     let easterEggTimer = null;
@@ -663,12 +735,15 @@
         isOverlapLoading.value = true;
         hasOverlapData.value = false;
         try {
-            // Target sessions already cached from loadData, only fetch current user
-            const currentUserRows = await database.getCurrentUserOnlineSessions();
+            if (!sessionCache.isReady()) {
+                sessionCache.onReady(() => loadOverlapData(userId));
+                sessionCache.triggerLoad();
+                return;
+            }
+
+            const currentSessions = await sessionCache.getSessions();
 
             if (userDialog.value.id !== userId) return;
-
-            const currentSessions = buildSessionsFromGamelog(currentUserRows);
 
             if (cachedTargetSessions.length === 0 || currentSessions.length === 0) {
                 hasOverlapData.value = false;
@@ -738,9 +813,13 @@
                     if (result.grid[d][h] > result.maxVal) result.maxVal = result.grid[d][h];
                 }
             }
-            // Recalculate overlap percent excluding those hours
-            const totalGrid = result.grid.flat().reduce((a, b) => a + b, 0);
-            if (totalGrid === 0) {
+            const overlapSessions = computeOverlapSessions(currentSessions, targetSessions);
+            const overlapMs = getIncludedSessionDurationMs(overlapSessions, start, end);
+            const currentMs = getIncludedSessionDurationMs(currentSessions, start, end);
+            const targetMs = getIncludedSessionDurationMs(targetSessions, start, end);
+            const minOnlineMs = Math.min(currentMs, targetMs);
+            result.overlapPercent = minOnlineMs > 0 ? Math.round((overlapMs / minOnlineMs) * 100) : 0;
+            if (overlapMs === 0) {
                 overlapPercent.value = 0;
                 bestOverlapTime.value = '';
                 return;
@@ -778,6 +857,59 @@
                 }
             }
         }
+    }
+
+    function computeOverlapSessions(sessionsA, sessionsB) {
+        const overlapSessions = [];
+        let i = 0;
+        let j = 0;
+
+        while (i < sessionsA.length && j < sessionsB.length) {
+            const a = sessionsA[i];
+            const b = sessionsB[j];
+            const start = Math.max(a.start, b.start);
+            const end = Math.min(a.end, b.end);
+            if (start < end) {
+                overlapSessions.push({ start, end });
+            }
+            if (a.end < b.end) {
+                i++;
+            } else {
+                j++;
+            }
+        }
+
+        return overlapSessions;
+    }
+
+    function getIncludedSessionDurationMs(sessions, startHour, endHour) {
+        let total = 0;
+        for (const session of sessions) {
+            let cursor = session.start;
+            while (cursor < session.end) {
+                const segmentEnd = getNextHourBoundaryMs(cursor, session.end);
+                if (!isHourExcluded(cursor, startHour, endHour)) {
+                    total += segmentEnd - cursor;
+                }
+                cursor = segmentEnd;
+            }
+        }
+        return total;
+    }
+
+    function getNextHourBoundaryMs(cursor, sessionEnd) {
+        const nextHour = new Date(cursor);
+        nextHour.setMinutes(0, 0, 0);
+        nextHour.setHours(nextHour.getHours() + 1);
+        return Math.min(nextHour.getTime(), sessionEnd);
+    }
+
+    function isHourExcluded(cursor, startHour, endHour) {
+        const hour = new Date(cursor).getHours();
+        if (startHour <= endHour) {
+            return hour >= startHour && hour < endHour;
+        }
+        return hour >= startHour || hour < endHour;
     }
 
     function onExcludeToggle(value) {
@@ -833,6 +965,7 @@
             yAxis: {
                 type: 'category',
                 data: displayDayLabels.value,
+                inverse: true,
                 splitArea: { show: false },
                 axisLabel: {
                     fontSize: 11
